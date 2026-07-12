@@ -1,4 +1,4 @@
-# 🏎️ Course de Dactylo
+# 🏎️ Turbooo !
 
 Un jeu de course de dactylographie multijoueur pour la classe — un clone de
 TypeRacer **100 % gratuit, sans pub et sans inscription**.
