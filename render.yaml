@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: course-de-dactylo
+    name: turbo-dactylo
     runtime: node
     plan: free
     buildCommand: npm install

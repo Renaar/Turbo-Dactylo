@@ -1,7 +1,9 @@
-# 🏎️ Turbooo !
+# 🏎️ Turbo Dactylo
 
 Un jeu de course de dactylographie multijoueur pour la classe — un clone de
 TypeRacer **100 % gratuit, sans pub et sans inscription**.
+
+🌍 Le jeu est en ligne sur [www.turbo-dactylo.ch](https://www.turbo-dactylo.ch).
 
 Chaque élève a une voiture vue du dessus. Un mot apparaît à l'écran : il faut
 le taper correctement au clavier pour faire avancer sa voiture. Quand le mot

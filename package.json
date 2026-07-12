@@ -1,7 +1,7 @@
 {
-  "name": "typing-race",
+  "name": "turbo-dactylo",
   "version": "1.0.0",
-  "description": "Jeu de course de dactylographie multijoueur pour la classe — clone de TypeRacer gratuit et sans pub",
+  "description": "Turbo Dactylo — jeu de course de dactylographie multijoueur pour la classe, gratuit et sans pub",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
