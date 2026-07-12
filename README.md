@@ -18,6 +18,11 @@ ligne d'arrivée !
   hasard dans une banque de 1 100 mots courants de la langue française et
   envoyée à tous les joueurs — la course est équitable.
 - **Nombre de mots réglable** : de 10 à 40 mots par course.
+- **Mode échauffement** : taper n'importe quels caractères le plus vite
+  possible (100 à 400 frappes) — parfait pour délier les doigts en début de
+  séance.
+- **Modération** : l'hôte peut renvoyer un joueur du salon (pseudo
+  inapproprié, etc.) d'un clic sur la croix à côté de son nom.
 - **Course en temps réel** : les voitures avancent en direct sur la piste,
   lettre par lettre, avec compte à rebours 3-2-1.
 - **Statistiques** : vitesse en MPM (mots par minute), temps, erreurs,

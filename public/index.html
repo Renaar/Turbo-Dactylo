@@ -45,6 +45,13 @@
 
       <div id="host-options" class="host-options hidden">
         <div class="option">
+          <label for="select-mode">Mode de jeu</label>
+          <select id="select-mode">
+            <option value="mots" selected>🏁 Course de mots</option>
+            <option value="echauffement">🔥 Échauffement</option>
+          </select>
+        </div>
+        <div class="option" id="opt-words">
           <label for="select-count">Nombre de mots</label>
           <select id="select-count">
             <option value="10">10 mots</option>
@@ -52,6 +59,15 @@
             <option value="20" selected>20 mots</option>
             <option value="30">30 mots</option>
             <option value="40">40 mots</option>
+          </select>
+        </div>
+        <div class="option hidden" id="opt-chars">
+          <label for="select-chars">Nombre de frappes</label>
+          <select id="select-chars">
+            <option value="100">100 frappes</option>
+            <option value="200" selected>200 frappes</option>
+            <option value="300">300 frappes</option>
+            <option value="400">400 frappes</option>
           </select>
         </div>
       </div>
@@ -95,7 +111,7 @@
       <div id="podium" class="podium"></div>
       <table class="results-table">
         <thead>
-          <tr><th>#</th><th>Joueur</th><th>Temps</th><th>MPM</th><th>Erreurs</th><th>Mots</th></tr>
+          <tr><th>#</th><th>Joueur</th><th>Temps</th><th>MPM</th><th>Erreurs</th><th id="th-words">Mots</th></tr>
         </thead>
         <tbody id="results-body"></tbody>
       </table>

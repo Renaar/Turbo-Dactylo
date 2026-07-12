@@ -8,7 +8,10 @@
   let myId = null;
   let lobby = null; // dernier état "lobby" reçu du serveur
   let race = {
+    mode: 'mots',
     words: [],
+    target: 0,
+    typed: 0,
     index: 0,
     mistakes: 0,
     prevLen: 0,
@@ -31,7 +34,11 @@
   const playerList = $('player-list');
   const hostOptions = $('host-options');
   const guestOptions = $('guest-options');
+  const selectMode = $('select-mode');
   const selectCount = $('select-count');
+  const selectChars = $('select-chars');
+  const optWords = $('opt-words');
+  const optChars = $('opt-chars');
   const btnStart = $('btn-start');
   const waitingMsg = $('waiting-msg');
   const trackEl = $('track');
@@ -120,7 +127,10 @@
         break;
 
       case 'race_setup': {
-        race.words = msg.words;
+        race.mode = msg.mode || 'mots';
+        race.words = msg.words || [];
+        race.target = msg.target || 0;
+        race.typed = 0;
         race.index = 0;
         race.mistakes = 0;
         race.prevLen = 0;
@@ -143,8 +153,21 @@
           inputTyping.disabled = false;
           inputTyping.value = '';
           inputTyping.focus();
-          renderWord('');
+          if (race.mode === 'echauffement') {
+            renderWarmup();
+          } else {
+            renderWord('');
+          }
         }
+        break;
+
+      case 'kicked':
+        myId = null;
+        lobby = null;
+        if (ws) ws.close();
+        ws = null;
+        showScreen('home');
+        showError('Tu as été renvoyé du salon par le professeur.');
         break;
 
       case 'progress':
@@ -169,10 +192,17 @@
 
     hostOptions.classList.toggle('hidden', !isHost);
     guestOptions.classList.toggle('hidden', isHost);
+    const opts = lobby.options;
     if (isHost) {
-      selectCount.value = String(lobby.options.wordCount);
+      selectMode.value = opts.mode;
+      selectCount.value = String(opts.wordCount);
+      selectChars.value = String(opts.charCount);
+      optWords.classList.toggle('hidden', opts.mode === 'echauffement');
+      optChars.classList.toggle('hidden', opts.mode !== 'echauffement');
     } else {
-      guestOptions.textContent = `Course de ${lobby.options.wordCount} mots`;
+      guestOptions.textContent = opts.mode === 'echauffement'
+        ? `🔥 Échauffement · ${opts.charCount} frappes`
+        : `🏁 Course de ${opts.wordCount} mots`;
     }
 
     btnStart.classList.toggle('hidden', !isHost);
@@ -203,6 +233,18 @@
         badge.textContent = '👀 spectateur';
         li.appendChild(badge);
       }
+      if (isHost && p.id !== myId) {
+        const kick = document.createElement('button');
+        kick.className = 'kick-btn';
+        kick.title = `Renvoyer ${p.name} du salon`;
+        kick.textContent = '✖';
+        kick.addEventListener('click', () => {
+          if (confirm(`Renvoyer ${p.name} du salon ?`)) {
+            sendMsg({ type: 'kick', id: p.id });
+          }
+        });
+        li.appendChild(kick);
+      }
       playerList.appendChild(li);
     }
   }
@@ -214,9 +256,17 @@
     inputTyping.disabled = true;
     spectatorMsg.classList.toggle('hidden', !race.spectator);
     wordDisplay.innerHTML = race.spectator ? '' : '…';
-    raceProgress.textContent = `Mot 0 / ${race.words.length}`;
+    raceProgress.textContent = race.mode === 'echauffement'
+      ? `0 / ${race.target} frappes`
+      : `Mot 0 / ${race.words.length}`;
     raceWpm.textContent = '0 MPM';
     buildTrack();
+  }
+
+  function renderWarmup() {
+    wordDisplay.innerHTML =
+      '<span class="warmup">🔥 Tape n’importe quoi,<br>le plus vite possible !</span>';
+    raceProgress.textContent = `${race.typed} / ${race.target} frappes`;
   }
 
   function buildTrack() {
@@ -280,6 +330,26 @@
   }
 
   function onTyping() {
+    if (race.mode === 'echauffement') {
+      const len = inputTyping.value.length;
+      if (len > race.prevLen) {
+        race.typed = Math.min(race.typed + (len - race.prevLen), race.target);
+        sendMsg({ type: 'typed', count: race.typed });
+      }
+      race.prevLen = len;
+      // On vide le champ régulièrement pour qu'il ne déborde jamais
+      if (len > 24) {
+        inputTyping.value = '';
+        race.prevLen = 0;
+      }
+      renderWarmup();
+      if (race.typed >= race.target) {
+        inputTyping.disabled = true;
+        wordDisplay.innerHTML = '🏁 Terminé !';
+      }
+      return;
+    }
+
     const word = race.words[race.index];
     if (word === undefined) return;
     const value = inputTyping.value;
@@ -334,6 +404,8 @@
       podium.appendChild(step);
     }
 
+    const warmup = race.mode === 'echauffement';
+    $('th-words').textContent = warmup ? 'Frappes' : 'Mots';
     resultsBody.innerHTML = '';
     results.forEach((r, i) => {
       const tr = document.createElement('tr');
@@ -344,7 +416,7 @@
         <td class="player-cell">${carSVG(r.color, 30)} ${escapeHTML(r.name)}${r.id === myId ? ' (toi)' : ''}</td>
         <td>${time}</td>
         <td>${r.wpm}</td>
-        <td>${r.mistakes}</td>
+        <td>${warmup ? '—' : r.mistakes}</td>
         <td>${r.wordIndex} / ${r.totalWords}</td>`;
       resultsBody.appendChild(tr);
     });
@@ -387,9 +459,16 @@
     connect(() => sendMsg({ type: 'join', name, code }));
   }
 
+  selectMode.addEventListener('change', sendOptions);
   selectCount.addEventListener('change', sendOptions);
+  selectChars.addEventListener('change', sendOptions);
   function sendOptions() {
-    sendMsg({ type: 'options', wordCount: parseInt(selectCount.value, 10) });
+    sendMsg({
+      type: 'options',
+      mode: selectMode.value,
+      wordCount: parseInt(selectCount.value, 10),
+      charCount: parseInt(selectChars.value, 10)
+    });
   }
 
   btnStart.addEventListener('click', () => sendMsg({ type: 'start' }));

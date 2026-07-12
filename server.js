@@ -128,8 +128,11 @@ function resetPlayerRace(p) {
 
 function startRace(lobby) {
   lobby.status = 'countdown';
+  const { mode, wordCount, charCount } = lobby.options;
   lobby.race = {
-    words: generateWordList(lobby.options.wordCount),
+    mode,
+    words: mode === 'echauffement' ? null : generateWordList(wordCount),
+    target: mode === 'echauffement' ? charCount : null,
     startTime: null,
     finishedCount: 0,
     tick: null
@@ -139,7 +142,7 @@ function startRace(lobby) {
     resetPlayerRace(p);
   }
   broadcast(lobby, lobbyState(lobby));
-  broadcast(lobby, { type: 'race_setup', words: lobby.race.words });
+  broadcast(lobby, { type: 'race_setup', mode, words: lobby.race.words, target: lobby.race.target });
 
   let n = 3;
   const step = () => {
@@ -156,6 +159,20 @@ function startRace(lobby) {
     }
   };
   step();
+}
+
+function finishPlayer(lobby, player) {
+  player.finished = true;
+  player.finishTime = Date.now();
+  player.rank = ++lobby.race.finishedCount;
+  player.progress = 1;
+  broadcast(lobby, {
+    type: 'player_finished',
+    id: player.id,
+    name: player.name,
+    rank: player.rank
+  });
+  maybeEndRace(lobby);
 }
 
 function endRace(lobby) {
@@ -176,7 +193,7 @@ function endRace(lobby) {
         wpm: Math.round((p.chars + p.partial) / 5 / elapsedMin),
         mistakes: p.mistakes,
         wordIndex: p.wordIndex,
-        totalWords: lobby.race.words.length
+        totalWords: lobby.race.words ? lobby.race.words.length : lobby.race.target
       };
     })
     .sort((a, b) => {
@@ -253,7 +270,7 @@ wss.on('connection', (ws) => {
             code: makeCode(),
             hostId: null,
             status: 'waiting',
-            options: { wordCount: 20 },
+            options: { mode: 'mots', wordCount: 20, charCount: 200 },
             players: new Map(),
             race: null,
             countdownTimer: null
@@ -285,7 +302,12 @@ wss.on('connection', (ws) => {
         send(ws, { type: 'welcome', playerId: player.id, code: lobby.code });
         broadcast(lobby, lobbyState(lobby));
         if (player.spectator && lobby.race) {
-          send(ws, { type: 'race_setup', words: lobby.race.words });
+          send(ws, {
+            type: 'race_setup',
+            mode: lobby.race.mode,
+            words: lobby.race.words,
+            target: lobby.race.target
+          });
           send(ws, { type: 'go' });
         }
         break;
@@ -293,9 +315,13 @@ wss.on('connection', (ws) => {
 
       case 'options': {
         if (!lobby || player.id !== lobby.hostId || lobby.status !== 'waiting') return;
+        const mode = ['mots', 'echauffement'].includes(msg.mode)
+          ? msg.mode : lobby.options.mode;
         const wordCount = [10, 15, 20, 30, 40].includes(msg.wordCount)
           ? msg.wordCount : lobby.options.wordCount;
-        lobby.options = { wordCount };
+        const charCount = [100, 200, 300, 400].includes(msg.charCount)
+          ? msg.charCount : lobby.options.charCount;
+        lobby.options = { mode, wordCount, charCount };
         broadcast(lobby, lobbyState(lobby));
         break;
       }
@@ -309,6 +335,21 @@ wss.on('connection', (ws) => {
 
       case 'typed': {
         if (!lobby || lobby.status !== 'racing' || player.spectator || player.finished) return;
+
+        if (lobby.race.mode === 'echauffement') {
+          // Échauffement : chaque frappe compte. On borne la progression par
+          // message pour éviter les sauts impossibles.
+          const target = lobby.race.target;
+          let count = Math.floor(Number(msg.count) || 0);
+          count = Math.min(count, target, player.chars + 20);
+          if (count <= player.chars) return;
+          player.chars = count;
+          player.wordIndex = count;
+          player.progress = count / target;
+          if (count >= target) finishPlayer(lobby, player);
+          break;
+        }
+
         const words = lobby.race.words;
         const word = words[player.wordIndex];
         if (word === undefined) return;
@@ -320,17 +361,7 @@ wss.on('connection', (ws) => {
           player.partial = 0;
           player.wordIndex++;
           if (player.wordIndex >= words.length) {
-            player.finished = true;
-            player.finishTime = Date.now();
-            player.rank = ++lobby.race.finishedCount;
-            player.progress = 1;
-            broadcast(lobby, {
-              type: 'player_finished',
-              id: player.id,
-              name: player.name,
-              rank: player.rank
-            });
-            maybeEndRace(lobby);
+            finishPlayer(lobby, player);
           } else {
             player.progress = player.wordIndex / words.length;
           }
@@ -342,6 +373,15 @@ wss.on('connection', (ws) => {
           player.partial = matched;
           player.progress = (player.wordIndex + matched / word.length) / words.length;
         }
+        break;
+      }
+
+      case 'kick': {
+        if (!lobby || player.id !== lobby.hostId) return;
+        const target = lobby.players.get(Number(msg.id));
+        if (!target || target.id === player.id) return;
+        send(target.ws, { type: 'kicked' });
+        target.ws.close();
         break;
       }
 
