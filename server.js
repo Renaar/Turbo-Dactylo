@@ -128,9 +128,8 @@ function resetPlayerRace(p) {
 
 function startRace(lobby) {
   lobby.status = 'countdown';
-  const { difficulty, wordCount } = lobby.options;
   lobby.race = {
-    words: generateWordList(difficulty, wordCount),
+    words: generateWordList(lobby.options.wordCount),
     startTime: null,
     finishedCount: 0,
     tick: null
@@ -254,7 +253,7 @@ wss.on('connection', (ws) => {
             code: makeCode(),
             hostId: null,
             status: 'waiting',
-            options: { difficulty: 'moyen', wordCount: 20 },
+            options: { wordCount: 20 },
             players: new Map(),
             race: null,
             countdownTimer: null
@@ -294,11 +293,9 @@ wss.on('connection', (ws) => {
 
       case 'options': {
         if (!lobby || player.id !== lobby.hostId || lobby.status !== 'waiting') return;
-        const difficulty = ['facile', 'moyen', 'difficile'].includes(msg.difficulty)
-          ? msg.difficulty : lobby.options.difficulty;
         const wordCount = [10, 15, 20, 30, 40].includes(msg.wordCount)
           ? msg.wordCount : lobby.options.wordCount;
-        lobby.options = { difficulty, wordCount };
+        lobby.options = { wordCount };
         broadcast(lobby, lobbyState(lobby));
         break;
       }

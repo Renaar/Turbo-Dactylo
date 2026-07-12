@@ -12,11 +12,10 @@ ligne d'arrivée !
 
 - **Salons privés** : le professeur crée un salon et obtient un code à
   5 caractères que les élèves saisissent pour rejoindre (jusqu'à 40 joueurs).
-- **Même liste de mots pour tous** : à chaque course, une liste est générée
-  aléatoirement et envoyée à tous les joueurs — la course est équitable.
-- **3 niveaux de difficulté** : facile (mots courts sans accents), moyen
-  (mots courants avec accents), difficile (mots longs et pièges
-  orthographiques). Nombre de mots réglable (10 à 40).
+- **Même liste de mots pour tous** : à chaque course, la liste est tirée au
+  hasard dans une banque de 1 100 mots courants de la langue française et
+  envoyée à tous les joueurs — la course est équitable.
+- **Nombre de mots réglable** : de 10 à 40 mots par course.
 - **Course en temps réel** : les voitures avancent en direct sur la piste,
   lettre par lettre, avec compte à rebours 3-2-1.
 - **Statistiques** : vitesse en MPM (mots par minute), temps, erreurs,
@@ -61,8 +60,7 @@ Un fichier `render.yaml` est fourni pour un déploiement en un clic sur Render.
 
 1. Le professeur entre son pseudo et clique sur **Créer un salon**.
 2. Les élèves entrent leur pseudo et le **code du salon**.
-3. L'hôte choisit la difficulté et le nombre de mots, puis clique sur
-   **Lancer la course**.
+3. L'hôte choisit le nombre de mots, puis clique sur **Lancer la course**.
 4. Compte à rebours, puis chacun tape les mots affichés — la voiture avance
    à chaque lettre correcte, les lettres fausses s'affichent en rouge et il
    faut les corriger pour continuer.
@@ -76,4 +74,5 @@ Un fichier `render.yaml` est fourni pour un déploiement en un clic sur Render.
 - Client : HTML/CSS/JavaScript sans framework.
 - Les mots sont validés côté serveur : la progression des voitures est
   calculée sur le serveur pour éviter la triche.
-- Les listes de mots se modifient facilement dans [`words.js`](words.js).
+- La banque de mots se modifie facilement dans [`words.js`](words.js)
+  (mots de dictée de la semaine, vocabulaire d'un thème…).

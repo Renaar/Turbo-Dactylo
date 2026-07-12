@@ -31,7 +31,6 @@
   const playerList = $('player-list');
   const hostOptions = $('host-options');
   const guestOptions = $('guest-options');
-  const selectDifficulty = $('select-difficulty');
   const selectCount = $('select-count');
   const btnStart = $('btn-start');
   const waitingMsg = $('waiting-msg');
@@ -49,8 +48,6 @@
   const resultsBody = $('results-body');
   const btnReplay = $('btn-replay');
   const replayWait = $('replay-wait');
-
-  const DIFFICULTY_LABELS = { facile: '🟢 Facile', moyen: '🟡 Moyen', difficile: '🔴 Difficile' };
 
   function showScreen(name) {
     for (const [key, el] of Object.entries(screens)) {
@@ -173,11 +170,9 @@
     hostOptions.classList.toggle('hidden', !isHost);
     guestOptions.classList.toggle('hidden', isHost);
     if (isHost) {
-      selectDifficulty.value = lobby.options.difficulty;
       selectCount.value = String(lobby.options.wordCount);
     } else {
-      guestOptions.textContent =
-        `${DIFFICULTY_LABELS[lobby.options.difficulty]} · ${lobby.options.wordCount} mots`;
+      guestOptions.textContent = `Course de ${lobby.options.wordCount} mots`;
     }
 
     btnStart.classList.toggle('hidden', !isHost);
@@ -392,14 +387,9 @@
     connect(() => sendMsg({ type: 'join', name, code }));
   }
 
-  selectDifficulty.addEventListener('change', sendOptions);
   selectCount.addEventListener('change', sendOptions);
   function sendOptions() {
-    sendMsg({
-      type: 'options',
-      difficulty: selectDifficulty.value,
-      wordCount: parseInt(selectCount.value, 10)
-    });
+    sendMsg({ type: 'options', wordCount: parseInt(selectCount.value, 10) });
   }
 
   btnStart.addEventListener('click', () => sendMsg({ type: 'start' }));
