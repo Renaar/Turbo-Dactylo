@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Course de Dactylo 🏁</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
+</head>
+<body>
+
+  <!-- Écran d'accueil -->
+  <section id="screen-home" class="screen active">
+    <div class="home-box">
+      <h1>🏎️ Course de Dactylo</h1>
+      <p class="subtitle">Tape les mots le plus vite possible pour faire avancer ta voiture&nbsp;!</p>
+
+      <label for="input-name">Ton pseudo</label>
+      <input id="input-name" type="text" maxlength="20" placeholder="Ex : Léa" autocomplete="off">
+
+      <div class="home-panels">
+        <div class="panel">
+          <h2>👩‍🏫 Créer un salon</h2>
+          <p>Crée une course et partage le code avec la classe.</p>
+          <button id="btn-create" class="btn btn-primary">Créer un salon</button>
+        </div>
+        <div class="panel">
+          <h2>🎒 Rejoindre un salon</h2>
+          <p>Entre le code donné par ton professeur.</p>
+          <input id="input-code" type="text" maxlength="5" placeholder="CODE" autocomplete="off">
+          <button id="btn-join" class="btn btn-secondary">Rejoindre</button>
+        </div>
+      </div>
+      <p id="home-error" class="error hidden"></p>
+    </div>
+  </section>
+
+  <!-- Écran salon d'attente -->
+  <section id="screen-lobby" class="screen">
+    <div class="lobby-box">
+      <h1>Salon d'attente</h1>
+      <p class="code-label">Code du salon</p>
+      <div id="lobby-code" class="lobby-code">-----</div>
+      <p class="code-hint">Partage ce code avec les autres joueurs</p>
+
+      <div id="host-options" class="host-options hidden">
+        <div class="option">
+          <label for="select-difficulty">Difficulté</label>
+          <select id="select-difficulty">
+            <option value="facile">🟢 Facile</option>
+            <option value="moyen" selected>🟡 Moyen</option>
+            <option value="difficile">🔴 Difficile</option>
+          </select>
+        </div>
+        <div class="option">
+          <label for="select-count">Nombre de mots</label>
+          <select id="select-count">
+            <option value="10">10 mots</option>
+            <option value="15">15 mots</option>
+            <option value="20" selected>20 mots</option>
+            <option value="30">30 mots</option>
+            <option value="40">40 mots</option>
+          </select>
+        </div>
+      </div>
+      <p id="guest-options" class="guest-options hidden"></p>
+
+      <h2 id="players-title">Joueurs</h2>
+      <ul id="player-list" class="player-list"></ul>
+
+      <button id="btn-start" class="btn btn-primary btn-big hidden">🏁 Lancer la course !</button>
+      <p id="waiting-msg" class="waiting-msg hidden">En attente du lancement de la course…</p>
+      <button id="btn-leave-lobby" class="btn btn-link">Quitter le salon</button>
+    </div>
+  </section>
+
+  <!-- Écran de course -->
+  <section id="screen-race" class="screen">
+    <div id="track" class="track"></div>
+
+    <div class="typing-zone">
+      <div class="race-info">
+        <span id="race-progress">Mot 0 / 0</span>
+        <span id="race-wpm">0 MPM</span>
+      </div>
+      <div id="word-display" class="word-display"></div>
+      <input id="input-typing" type="text" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" placeholder="Tape ici…" disabled>
+      <p id="spectator-msg" class="waiting-msg hidden">👀 Une course est en cours, tu participeras à la prochaine !</p>
+      <button id="btn-end-race" class="btn btn-link hidden">Terminer la course pour tout le monde</button>
+    </div>
+
+    <div id="countdown-overlay" class="countdown-overlay hidden">
+      <div id="countdown-number">3</div>
+    </div>
+    <div id="finish-banner" class="finish-banner hidden"></div>
+  </section>
+
+  <!-- Écran des résultats -->
+  <section id="screen-results" class="screen">
+    <div class="results-box">
+      <h1>🏆 Résultats de la course</h1>
+      <div id="podium" class="podium"></div>
+      <table class="results-table">
+        <thead>
+          <tr><th>#</th><th>Joueur</th><th>Temps</th><th>MPM</th><th>Erreurs</th><th>Mots</th></tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+      <button id="btn-replay" class="btn btn-primary btn-big hidden">🔄 Rejouer</button>
+      <p id="replay-wait" class="waiting-msg hidden">En attente d'une nouvelle course…</p>
+      <button id="btn-leave-results" class="btn btn-link">Quitter le salon</button>
+    </div>
+  </section>
+
+  <footer>100 % gratuit, sans pub — fait pour la classe ❤️</footer>
+
+  <script src="game.js"></script>
+</body>
+</html>
