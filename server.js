@@ -6,9 +6,14 @@ const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
 const { generateWordList } = require('./words');
+const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+// PIN de modération du leaderboard (à changer via la variable d'environnement)
+const MODERATION_PIN = process.env.TURBO_PIN || 'turbo';
+
+db.load();
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -19,8 +24,46 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
+function sendJSON(res, status, obj) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(obj));
+}
+
+function handleApi(req, res, url) {
+  if (req.method === 'GET' && url.pathname === '/api/classements') {
+    const mode = url.searchParams.get('mode') === 'echauffement' ? 'echauffement' : 'mots';
+    const days = Math.max(0, parseInt(url.searchParams.get('jours'), 10) || 0);
+    const classe = (url.searchParams.get('classe') || '').slice(0, 20);
+    return sendJSON(res, 200, {
+      ...db.leaderboard({ mode, days, classe }),
+      classes: db.classes()
+    });
+  }
+  if (req.method === 'GET' && url.pathname === '/api/joueur') {
+    const pseudo = (url.searchParams.get('pseudo') || '').slice(0, 20);
+    const mode = url.searchParams.get('mode') === 'echauffement' ? 'echauffement' : 'mots';
+    const stats = db.playerStats(pseudo, mode);
+    return sendJSON(res, stats ? 200 : 404, stats || { error: 'Joueur inconnu' });
+  }
+  if (req.method === 'POST' && url.pathname === '/api/moderation') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+    req.on('end', () => {
+      let msg;
+      try { msg = JSON.parse(body); } catch { return sendJSON(res, 400, { error: 'Requête invalide' }); }
+      if (msg.pin !== MODERATION_PIN) return sendJSON(res, 403, { error: 'PIN incorrect' });
+      const ok = db.remove(String(msg.id || ''));
+      sendJSON(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Entrée introuvable' });
+    });
+    return;
+  }
+  sendJSON(res, 404, { error: 'Introuvable' });
+}
+
 const server = http.createServer((req, res) => {
-  let urlPath = decodeURIComponent(req.url.split('?')[0]);
+  const url = new URL(req.url, 'http://localhost');
+  if (url.pathname.startsWith('/api/')) return handleApi(req, res, url);
+  let urlPath = decodeURIComponent(url.pathname);
   if (urlPath === '/') urlPath = '/index.html';
   const filePath = path.join(PUBLIC_DIR, path.normalize(urlPath));
   if (!filePath.startsWith(PUBLIC_DIR)) {
@@ -83,6 +126,7 @@ function lobbyState(lobby) {
     hostId: lobby.hostId,
     status: lobby.status,
     options: lobby.options,
+    classe: lobby.classe,
     players: [...lobby.players.values()].map((p) => ({
       id: p.id,
       name: p.name,
@@ -138,7 +182,8 @@ function startRace(lobby) {
     tick: null
   };
   for (const p of lobby.players.values()) {
-    p.spectator = false;
+    // L'hôte organise la course mais n'y participe pas
+    p.spectator = p.id === lobby.hostId;
     resetPlayerRace(p);
   }
   broadcast(lobby, lobbyState(lobby));
@@ -203,6 +248,21 @@ function endRace(lobby) {
     });
   broadcast(lobby, { type: 'results', results });
   broadcast(lobby, lobbyState(lobby));
+
+  // Enregistre les courses terminées dans le leaderboard
+  db.add(results
+    .filter((r) => r.finished)
+    .map((r) => ({
+      id: db.makeId(),
+      ts: Date.now(),
+      pseudo: r.name,
+      classe: lobby.classe || '',
+      mode: lobby.race.mode,
+      wpm: r.wpm,
+      mistakes: r.mistakes,
+      timeS: Math.round(r.time * 10) / 10,
+      total: r.totalWords
+    })));
 }
 
 function maybeEndRace(lobby) {
@@ -271,6 +331,7 @@ wss.on('connection', (ws) => {
             hostId: null,
             status: 'waiting',
             options: { mode: 'mots', wordCount: 20, charCount: 200 },
+            classe: String(msg.classe || '').trim().slice(0, 20),
             players: new Map(),
             race: null,
             countdownTimer: null
@@ -329,6 +390,15 @@ wss.on('connection', (ws) => {
       case 'start': {
         if (!lobby || player.id !== lobby.hostId) return;
         if (lobby.status !== 'waiting' && lobby.status !== 'results') return;
+        const racers = [...lobby.players.values()].filter(
+          (p) => p.id !== lobby.hostId && p.ws.readyState === p.ws.OPEN
+        );
+        if (racers.length === 0) {
+          return send(ws, {
+            type: 'lobby_error',
+            message: 'Il faut au moins un joueur dans le salon pour lancer la course.'
+          });
+        }
         startRace(lobby);
         break;
       }

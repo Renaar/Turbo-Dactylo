@@ -12,6 +12,9 @@ ligne d'arrivée !
 
 - **Salons privés** : le professeur crée un salon et obtient un code à
   5 caractères que les élèves saisissent pour rejoindre (jusqu'à 40 joueurs).
+  Le créateur du salon **organise la course sans y participer** : il donne le
+  départ, suit les voitures et peut terminer la course — ce qui empêche
+  aussi un joueur de créer des salons pour gonfler ses propres scores.
 - **Même liste de mots pour tous** : à chaque course, la liste est tirée au
   hasard dans une banque de 1 100 mots courants de la langue française et
   envoyée à tous les joueurs — la course est équitable.
@@ -21,6 +24,13 @@ ligne d'arrivée !
   séance.
 - **Modération** : l'hôte peut renvoyer un joueur du salon (pseudo
   inapproprié, etc.) d'un clic sur la croix à côté de son nom.
+- **🏆 Classements persistants, sans comptes** : chaque course terminée est
+  enregistrée (pseudo, MPM, erreurs, date, classe). La page « Classements »
+  affiche les plus rapides et les plus assidus, filtrables par mode, par
+  période (semaine / mois / toujours) et par classe, plus les statistiques
+  détaillées de chaque joueur. Le champ « Classe » est saisi (optionnellement)
+  à la création du salon. Les élèves doivent **toujours utiliser le même
+  pseudo** pour retrouver leurs statistiques (le navigateur le mémorise).
 - **Course en temps réel** : les voitures avancent en direct sur la piste,
   lettre par lettre, avec compte à rebours 3-2-1.
 - **Statistiques** : vitesse en MPM (mots par minute), temps, erreurs,
@@ -72,12 +82,24 @@ Un fichier `render.yaml` est fourni pour un déploiement en un clic sur Render.
 5. À la fin, le podium et le tableau des scores s'affichent ; l'hôte peut
    relancer une course immédiatement.
 
+## 🛡️ Modération des classements
+
+Pour retirer une entrée du classement (pseudo inapproprié…) : page
+« Classements » → lien **Modération** en bas → saisir le PIN → une croix
+apparaît à côté de chaque entrée. Le PIN par défaut est `turbo` ;
+**changez-le** en définissant la variable d'environnement `TURBO_PIN` au
+lancement du serveur (`TURBO_PIN=monsecret npm start`).
+
 ## 🛠️ Technique
 
 - Serveur : Node.js + [`ws`](https://github.com/websockets/ws) (WebSockets),
-  aucune base de données — tout est en mémoire.
+  aucune autre dépendance.
 - Client : HTML/CSS/JavaScript sans framework.
 - Les mots sont validés côté serveur : la progression des voitures est
   calculée sur le serveur pour éviter la triche.
 - La banque de mots se modifie facilement dans [`words.js`](words.js)
   (mots de dictée de la semaine, vocabulaire d'un thème…).
+- Les résultats des courses sont stockés dans `data/resultats.ndjson`
+  (emplacement modifiable via `TURBO_DATA_DIR`). **Sauvegardez ce fichier**
+  régulièrement si les classements comptent pour vous — c'est la seule
+  donnée persistante du jeu.

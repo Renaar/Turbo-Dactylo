@@ -24,12 +24,15 @@
     home: $('screen-home'),
     lobby: $('screen-lobby'),
     race: $('screen-race'),
-    results: $('screen-results')
+    results: $('screen-results'),
+    leaderboard: $('screen-leaderboard')
   };
 
   const inputName = $('input-name');
   const inputCode = $('input-code');
+  const inputClasse = $('input-classe');
   const homeError = $('home-error');
+  const lobbyError = $('lobby-error');
   const lobbyCodeEl = $('lobby-code');
   const playerList = $('player-list');
   const hostOptions = $('host-options');
@@ -107,6 +110,12 @@
       case 'error':
         showError(msg.message);
         if (myId === null && ws) ws.close();
+        break;
+
+      case 'lobby_error':
+        lobbyError.textContent = msg.message;
+        lobbyError.classList.remove('hidden');
+        setTimeout(() => lobbyError.classList.add('hidden'), 4000);
         break;
 
       case 'welcome':
@@ -206,6 +215,9 @@
     }
 
     btnStart.classList.toggle('hidden', !isHost);
+    btnStart.disabled = lobby.players.length < 2;
+    btnStart.title = lobby.players.length < 2
+      ? 'Attends qu\'au moins un joueur rejoigne le salon' : '';
     waitingMsg.classList.toggle('hidden', isHost);
     btnReplay.classList.toggle('hidden', !isHost);
     replayWait.classList.toggle('hidden', isHost);
@@ -224,10 +236,10 @@
       if (p.id === lobby.hostId) {
         const badge = document.createElement('span');
         badge.className = 'host-badge';
-        badge.textContent = '⭐ hôte';
+        badge.textContent = '⭐ organise';
         li.appendChild(badge);
       }
-      if (p.spectator) {
+      if (p.spectator && p.id !== lobby.hostId) {
         const badge = document.createElement('span');
         badge.className = 'spectator-badge';
         badge.textContent = '👀 spectateur';
@@ -254,7 +266,13 @@
     finishBanner.classList.add('hidden');
     inputTyping.value = '';
     inputTyping.disabled = true;
+    const isHost = lobby && lobby.hostId === myId;
+    spectatorMsg.textContent = isHost
+      ? '🎓 Tu organises la course — encourage tes joueurs !'
+      : '👀 Une course est en cours, tu participeras à la prochaine !';
     spectatorMsg.classList.toggle('hidden', !race.spectator);
+    inputTyping.classList.toggle('hidden', race.spectator);
+    document.querySelector('.race-info').classList.toggle('hidden', race.spectator);
     wordDisplay.innerHTML = race.spectator ? '' : '…';
     raceProgress.textContent = race.mode === 'echauffement'
       ? `0 / ${race.target} frappes`
@@ -440,10 +458,25 @@
   }
 
   // --- Événements UI -----------------------------------------------------------------
+  // Le pseudo est mémorisé sur l'appareil pour garder des statistiques cohérentes
+  try {
+    inputName.value = localStorage.getItem('turbo-pseudo') || '';
+    inputClasse.value = localStorage.getItem('turbo-classe') || '';
+  } catch { /* stockage local indisponible : tant pis */ }
+
+  function rememberMe(name) {
+    try {
+      localStorage.setItem('turbo-pseudo', name);
+      localStorage.setItem('turbo-classe', inputClasse.value.trim());
+    } catch { /* ignore */ }
+  }
+
   $('btn-create').addEventListener('click', () => {
     const name = inputName.value.trim();
     if (!name) return showError('Choisis un pseudo avant de créer un salon.');
-    connect(() => sendMsg({ type: 'create', name }));
+    rememberMe(name);
+    const classe = inputClasse.value.trim();
+    connect(() => sendMsg({ type: 'create', name, classe }));
   });
 
   $('btn-join').addEventListener('click', joinLobby);
@@ -456,6 +489,7 @@
     const code = inputCode.value.trim().toUpperCase();
     if (!name) return showError('Choisis un pseudo avant de rejoindre.');
     if (code.length !== 5) return showError('Le code du salon fait 5 caractères.');
+    rememberMe(name);
     connect(() => sendMsg({ type: 'join', name, code }));
   }
 
@@ -486,4 +520,123 @@
   }
   $('btn-leave-lobby').addEventListener('click', leave);
   $('btn-leave-results').addEventListener('click', leave);
+
+  // --- Classements -------------------------------------------------------------------
+  const lbMode = $('lb-mode');
+  const lbPeriode = $('lb-periode');
+  const lbClasse = $('lb-classe');
+  const lbPlayer = $('lb-player');
+  let moderationPin = null;
+
+  async function loadLeaderboard() {
+    const params = new URLSearchParams({
+      mode: lbMode.value,
+      jours: lbPeriode.value,
+      classe: lbClasse.value
+    });
+    let data;
+    try {
+      data = await (await fetch(`/api/classements?${params}`)).json();
+    } catch {
+      $('lb-empty').classList.remove('hidden');
+      return;
+    }
+
+    // Filtre des classes (on préserve la sélection actuelle)
+    const current = lbClasse.value;
+    lbClasse.innerHTML = '<option value="">Toutes les classes</option>';
+    for (const c of data.classes) {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = c;
+      lbClasse.appendChild(opt);
+    }
+    lbClasse.value = data.classes.includes(current) ? current : '';
+
+    $('lb-empty').classList.toggle('hidden', data.top.length > 0);
+
+    const medals = ['🥇', '🥈', '🥉'];
+    const topBody = $('lb-top');
+    topBody.innerHTML = '';
+    data.top.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      const date = new Date(r.ts).toLocaleDateString('fr-CH');
+      tr.innerHTML = `
+        <td>${medals[i] || i + 1}</td>
+        <td><button class="lb-pseudo" data-pseudo="${escapeHTML(r.pseudo)}">${escapeHTML(r.pseudo)}</button></td>
+        <td>${escapeHTML(r.classe || '—')}</td>
+        <td><strong>${r.wpm}</strong></td>
+        <td>${date}${moderationPin ? ` <button class="kick-btn lb-delete" data-id="${r.id}" title="Supprimer cette entrée">✖</button>` : ''}</td>`;
+      topBody.appendChild(tr);
+    });
+
+    const assBody = $('lb-assidus');
+    assBody.innerHTML = '';
+    data.assidus.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${medals[i] || i + 1}</td>
+        <td><button class="lb-pseudo" data-pseudo="${escapeHTML(r.pseudo)}">${escapeHTML(r.pseudo)}</button></td>
+        <td>${escapeHTML(r.classe || '—')}</td>
+        <td>${r.count}</td>`;
+      assBody.appendChild(tr);
+    });
+
+    for (const btn of document.querySelectorAll('.lb-pseudo')) {
+      btn.addEventListener('click', () => showPlayerStats(btn.dataset.pseudo));
+    }
+    for (const btn of document.querySelectorAll('.lb-delete')) {
+      btn.addEventListener('click', async () => {
+        const resp = await fetch('/api/moderation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: moderationPin, id: btn.dataset.id })
+        });
+        if (resp.status === 403) {
+          moderationPin = null;
+          alert('PIN incorrect.');
+        }
+        loadLeaderboard();
+      });
+    }
+  }
+
+  async function showPlayerStats(pseudo) {
+    const params = new URLSearchParams({ pseudo, mode: lbMode.value });
+    const resp = await fetch(`/api/joueur?${params}`);
+    if (!resp.ok) return;
+    const s = await resp.json();
+    $('lb-player-title').textContent = `📊 Statistiques de ${s.pseudo}`;
+    $('lb-player-summary').textContent =
+      `Record : ${s.best.wpm} MPM · Moyenne (10 dernières) : ${s.avg} MPM · ${s.count} course${s.count > 1 ? 's' : ''} jouée${s.count > 1 ? 's' : ''}`;
+    const body = $('lb-player-races');
+    body.innerHTML = '';
+    for (const r of s.dernieres) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${new Date(r.ts).toLocaleDateString('fr-CH')}</td>
+        <td><strong>${r.wpm}</strong></td>
+        <td>${lbMode.value === 'echauffement' ? '—' : r.mistakes}</td>
+        <td>${escapeHTML(r.classe || '—')}</td>`;
+      body.appendChild(tr);
+    }
+    lbPlayer.classList.remove('hidden');
+    lbPlayer.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function openLeaderboard() {
+    lbPlayer.classList.add('hidden');
+    showScreen('leaderboard');
+    loadLeaderboard();
+  }
+
+  $('btn-leaderboard').addEventListener('click', openLeaderboard);
+  $('btn-lb-back').addEventListener('click', () => showScreen('home'));
+  lbMode.addEventListener('change', loadLeaderboard);
+  lbPeriode.addEventListener('change', loadLeaderboard);
+  lbClasse.addEventListener('change', loadLeaderboard);
+  $('btn-lb-moderation').addEventListener('click', () => {
+    moderationPin = prompt('PIN de modération :');
+    loadLeaderboard();
+  });
 })();

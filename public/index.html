@@ -17,11 +17,16 @@
 
       <label for="input-name">Ton pseudo</label>
       <input id="input-name" type="text" maxlength="20" placeholder="Ex : Léa" autocomplete="off">
+      <p class="pseudo-hint">💡 Utilise toujours le même pseudo pour retrouver tes statistiques
+        dans les classements !</p>
 
       <div class="home-panels">
         <div class="panel">
           <h2>👩‍🏫 Créer un salon</h2>
-          <p>Crée une course et partage le code avec la classe.</p>
+          <p>Tu organises la course sans y participer : les autres joueurs courent,
+            tu donnes le départ.</p>
+          <input id="input-classe" type="text" maxlength="20" placeholder="Classe (optionnel, ex : 7P-A)"
+                 autocomplete="off">
           <button id="btn-create" class="btn btn-primary">Créer un salon</button>
         </div>
         <div class="panel">
@@ -32,6 +37,7 @@
         </div>
       </div>
       <p id="home-error" class="error hidden"></p>
+      <button id="btn-leaderboard" class="btn btn-gold">🏆 Voir les classements</button>
     </div>
   </section>
 
@@ -77,6 +83,7 @@
       <ul id="player-list" class="player-list"></ul>
 
       <button id="btn-start" class="btn btn-primary btn-big hidden">🏁 Lancer la course !</button>
+      <p id="lobby-error" class="error hidden"></p>
       <p id="waiting-msg" class="waiting-msg hidden">En attente du lancement de la course…</p>
       <button id="btn-leave-lobby" class="btn btn-link">Quitter le salon</button>
     </div>
@@ -118,6 +125,59 @@
       <button id="btn-replay" class="btn btn-primary btn-big hidden">🔄 Rejouer</button>
       <p id="replay-wait" class="waiting-msg hidden">En attente d'une nouvelle course…</p>
       <button id="btn-leave-results" class="btn btn-link">Quitter le salon</button>
+    </div>
+  </section>
+
+  <!-- Écran des classements -->
+  <section id="screen-leaderboard" class="screen">
+    <div class="leaderboard-box">
+      <h1>🏆 Classements</h1>
+      <div class="lb-filters">
+        <select id="lb-mode">
+          <option value="mots" selected>🏁 Course de mots</option>
+          <option value="echauffement">🔥 Échauffement</option>
+        </select>
+        <select id="lb-periode">
+          <option value="7">Cette semaine</option>
+          <option value="30">Ce mois</option>
+          <option value="0" selected>Depuis toujours</option>
+        </select>
+        <select id="lb-classe">
+          <option value="">Toutes les classes</option>
+        </select>
+      </div>
+
+      <h2>⚡ Les plus rapides</h2>
+      <table class="results-table">
+        <thead>
+          <tr><th>#</th><th>Pseudo</th><th>Classe</th><th>MPM</th><th>Date</th></tr>
+        </thead>
+        <tbody id="lb-top"></tbody>
+      </table>
+      <p id="lb-empty" class="waiting-msg hidden">Aucune course enregistrée pour le moment —
+        les résultats apparaissent ici dès la première course terminée !</p>
+
+      <h2>🎯 Les plus assidus</h2>
+      <table class="results-table">
+        <thead>
+          <tr><th>#</th><th>Pseudo</th><th>Classe</th><th>Courses jouées</th></tr>
+        </thead>
+        <tbody id="lb-assidus"></tbody>
+      </table>
+
+      <div id="lb-player" class="lb-player hidden">
+        <h2 id="lb-player-title"></h2>
+        <p id="lb-player-summary"></p>
+        <table class="results-table">
+          <thead>
+            <tr><th>Date</th><th>MPM</th><th>Erreurs</th><th>Classe</th></tr>
+          </thead>
+          <tbody id="lb-player-races"></tbody>
+        </table>
+      </div>
+
+      <button id="btn-lb-back" class="btn btn-secondary btn-big">⬅ Retour à l'accueil</button>
+      <button id="btn-lb-moderation" class="btn btn-link">Modération</button>
     </div>
   </section>
 
