@@ -63,6 +63,8 @@
     for (const [key, el] of Object.entries(screens)) {
       el.classList.toggle('active', key === name);
     }
+    // En course, la page tient dans l'écran (voir body.race-mode)
+    document.body.classList.toggle('race-mode', name === 'race');
   }
 
   // --- Voiture (vue du dessus, avance vers la droite) ---------------------
@@ -151,6 +153,7 @@
 
       case 'countdown':
         showScreen('race');
+        layoutTrack();
         countdownOverlay.classList.remove('hidden');
         countdownNumber.textContent = msg.n;
         break;
@@ -158,6 +161,7 @@
       case 'go':
         showScreen('race');
         countdownOverlay.classList.add('hidden');
+        layoutTrack();
         if (!race.spectator) {
           inputTyping.disabled = false;
           inputTyping.value = '';
@@ -267,12 +271,11 @@
     inputTyping.value = '';
     inputTyping.disabled = true;
     const isHost = lobby && lobby.hostId === myId;
-    spectatorMsg.textContent = isHost
-      ? '🎓 Tu organises la course — encourage tes joueurs !'
-      : '👀 Une course est en cours, tu participeras à la prochaine !';
-    spectatorMsg.classList.toggle('hidden', !race.spectator);
-    inputTyping.classList.toggle('hidden', race.spectator);
-    document.querySelector('.race-info').classList.toggle('hidden', race.spectator);
+    // Organisateur et spectateurs : la piste occupe tout l'écran
+    screens.race.classList.toggle('spectating', race.spectator);
+    // L'organisateur a son bouton dans le coin ; seul le spectateur
+    // retardataire a besoin d'une explication.
+    spectatorMsg.classList.toggle('hidden', !race.spectator || isHost);
     wordDisplay.innerHTML = race.spectator ? '' : '…';
     raceProgress.textContent = race.mode === 'echauffement'
       ? `0 / ${race.target} frappes`
@@ -303,7 +306,43 @@
         <div class="car">${carSVG(p.color)}</div>`;
       trackEl.appendChild(lane);
     }
+    layoutTrack();
   }
+
+  /**
+   * Ajuste la hauteur des couloirs pour que tous les joueurs tiennent à
+   * l'écran, sans jamais descendre sous une taille lisible.
+   */
+  function layoutTrack() {
+    const lanes = trackEl.querySelectorAll('.lane');
+    if (!lanes.length || !screens.race.classList.contains('active')) return;
+    const screenStyle = getComputedStyle(screens.race);
+    const trackStyle = getComputedStyle(trackEl);
+    let avail = screens.race.getBoundingClientRect().height
+      - parseFloat(screenStyle.paddingTop) - parseFloat(screenStyle.paddingBottom)
+      - parseFloat(trackStyle.paddingTop) - parseFloat(trackStyle.paddingBottom);
+    const zone = document.querySelector('.typing-zone');
+    if (zone.offsetParent) avail -= zone.getBoundingClientRect().height + 18;
+
+    const laneH = Math.max(28, Math.min(52, Math.floor(avail / lanes.length)));
+    trackEl.style.setProperty('--lane-h', `${laneH}px`);
+    trackEl.style.setProperty('--car-w', `${Math.round(Math.max(26, Math.min(46, laneH * 0.9)))}px`);
+    trackEl.classList.toggle('compact', laneH < 42);
+
+    // Si la piste déborde malgré tout, le joueur doit au moins voir sa
+    // propre voiture : on la recentre dans la piste.
+    if (!race.spectator && myId !== null) {
+      const mine = trackEl.querySelector(`.lane[data-player-id="${myId}"]`);
+      if (mine) {
+        const laneBox = mine.getBoundingClientRect();
+        const trackBox = trackEl.getBoundingClientRect();
+        trackEl.scrollTop += (laneBox.top - trackBox.top)
+          - (trackBox.height - laneBox.height) / 2;
+      }
+    }
+  }
+
+  window.addEventListener('resize', layoutTrack);
 
   function updateTrack(players) {
     for (const p of players) {
