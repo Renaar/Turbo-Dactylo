@@ -30,15 +30,29 @@ function add(rows) {
   fs.appendFileSync(FILE, rows.map((r) => JSON.stringify(r)).join('\n') + '\n');
 }
 
-function remove(id) {
-  const before = entries.length;
-  entries = entries.filter((e) => e.id !== id);
-  if (entries.length === before) return false;
+function rewrite() {
   fs.writeFileSync(
     FILE,
     entries.map((e) => JSON.stringify(e)).join('\n') + (entries.length ? '\n' : '')
   );
+}
+
+function remove(id) {
+  const before = entries.length;
+  entries = entries.filter((e) => e.id !== id);
+  if (entries.length === before) return false;
+  rewrite();
   return true;
+}
+
+/** Supprime toutes les entrées d'un pseudo ; renvoie le nombre supprimé. */
+function removeByPseudo(pseudo) {
+  const k = key(pseudo);
+  const before = entries.length;
+  entries = entries.filter((e) => key(e.pseudo) !== k);
+  const removed = before - entries.length;
+  if (removed) rewrite();
+  return removed;
 }
 
 function makeId() {
@@ -122,4 +136,6 @@ function classes() {
   return [...new Set(entries.map((e) => e.classe).filter(Boolean))].sort();
 }
 
-module.exports = { load, add, remove, makeId, leaderboard, playerStats, classes, FILE };
+module.exports = {
+  load, add, remove, removeByPseudo, makeId, leaderboard, playerStats, classes, FILE
+};

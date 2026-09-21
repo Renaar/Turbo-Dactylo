@@ -29,9 +29,13 @@ function sendJSON(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// Classements disponibles : courses de classe (mots), échauffement, solo
+const MODES = ['mots', 'echauffement', 'solo'];
+const readMode = (v) => (MODES.includes(v) ? v : 'mots');
+
 function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/classements') {
-    const mode = url.searchParams.get('mode') === 'echauffement' ? 'echauffement' : 'mots';
+    const mode = readMode(url.searchParams.get('mode'));
     const days = Math.max(0, parseInt(url.searchParams.get('jours'), 10) || 0);
     const classe = (url.searchParams.get('classe') || '').slice(0, 20);
     return sendJSON(res, 200, {
@@ -41,8 +45,7 @@ function handleApi(req, res, url) {
   }
   if (req.method === 'GET' && url.pathname === '/api/joueur') {
     const pseudo = (url.searchParams.get('pseudo') || '').slice(0, 20);
-    const mode = url.searchParams.get('mode') === 'echauffement' ? 'echauffement' : 'mots';
-    const stats = db.playerStats(pseudo, mode);
+    const stats = db.playerStats(pseudo, readMode(url.searchParams.get('mode')));
     return sendJSON(res, stats ? 200 : 404, stats || { error: 'Joueur inconnu' });
   }
   if (req.method === 'POST' && url.pathname === '/api/moderation') {
@@ -52,6 +55,13 @@ function handleApi(req, res, url) {
       let msg;
       try { msg = JSON.parse(body); } catch { return sendJSON(res, 400, { error: 'Requête invalide' }); }
       if (msg.pin !== MODERATION_PIN) return sendJSON(res, 403, { error: 'PIN incorrect' });
+      // Suppression d'une entrée, ou de toutes celles d'un pseudo
+      // (utile quand un pseudo inapproprié a couru plusieurs fois)
+      if (msg.pseudo) {
+        const n = db.removeByPseudo(String(msg.pseudo));
+        return sendJSON(res, n ? 200 : 404,
+          n ? { ok: true, supprimees: n } : { error: 'Pseudo introuvable' });
+      }
       const ok = db.remove(String(msg.id || ''));
       sendJSON(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'Entrée introuvable' });
     });
@@ -252,11 +262,9 @@ function endRace(lobby) {
   broadcast(lobby, { type: 'results', results });
   broadcast(lobby, lobbyState(lobby));
 
-  // Les entraînements solo ne sont pas enregistrés : le classement de
-  // classe ne récompense que les courses organisées par un enseignant.
-  if (lobby.solo) return;
-
-  // Enregistre les courses terminées dans le leaderboard
+  // Enregistre les courses terminées. Les entraînements solo vont dans
+  // leur propre classement : le classement de classe ne récompense que
+  // les courses organisées par un enseignant.
   db.add(results
     .filter((r) => r.finished)
     .map((r) => ({
@@ -264,7 +272,7 @@ function endRace(lobby) {
       ts: Date.now(),
       pseudo: r.name,
       classe: lobby.classe || '',
-      mode: lobby.race.mode,
+      mode: lobby.solo ? 'solo' : lobby.race.mode,
       wpm: r.wpm,
       mistakes: r.mistakes,
       timeS: Math.round(r.time * 10) / 10,

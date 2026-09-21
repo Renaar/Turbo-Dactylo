@@ -665,6 +665,8 @@
   let moderationPin = null;
 
   async function loadLeaderboard() {
+    // Le solo ignore le filtre de classe (ces courses n'en ont pas)
+    if (lbMode.value === 'solo') lbClasse.value = '';
     const params = new URLSearchParams({
       mode: lbMode.value,
       jours: lbPeriode.value,
@@ -677,6 +679,17 @@
       $('lb-empty').classList.remove('hidden');
       return;
     }
+
+    // L'entraînement solo n'est rattaché à aucune classe
+    const solo = lbMode.value === 'solo';
+    lbClasse.disabled = solo;
+    lbClasse.title = solo ? 'Les entraînements solo ne sont pas liés à une classe' : '';
+    document.querySelector('.leaderboard-box').classList.toggle('solo-view', solo);
+    const intro = $('lb-intro');
+    intro.classList.toggle('hidden', !solo);
+    intro.textContent = solo
+      ? '⏱️ Courses d\'entraînement faites en solo — un classement à part, pour le plaisir de progresser.'
+      : '';
 
     // Filtre des classes (on préserve la sélection actuelle)
     const current = lbClasse.value;
@@ -702,7 +715,11 @@
         <td><button class="lb-pseudo" data-pseudo="${escapeHTML(r.pseudo)}">${escapeHTML(r.pseudo)}</button></td>
         <td>${escapeHTML(r.classe || '—')}</td>
         <td><strong>${r.wpm}</strong></td>
-        <td>${date}${moderationPin ? ` <button class="kick-btn lb-delete" data-id="${r.id}" title="Supprimer cette entrée">✖</button>` : ''}</td>`;
+        <td>${date}${moderationPin ? `
+          <button class="kick-btn lb-delete" data-id="${r.id}"
+            data-pseudo="${escapeHTML(r.pseudo)}" title="Supprimer ce résultat">✖</button>
+          <button class="kick-btn lb-delete-all" data-pseudo="${escapeHTML(r.pseudo)}"
+            title="Supprimer toutes les courses de ce pseudo">🗑</button>` : ''}</td>`;
       topBody.appendChild(tr);
     });
 
@@ -722,19 +739,32 @@
       btn.addEventListener('click', () => showPlayerStats(btn.dataset.pseudo));
     }
     for (const btn of document.querySelectorAll('.lb-delete')) {
-      btn.addEventListener('click', async () => {
-        const resp = await fetch('/api/moderation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: moderationPin, id: btn.dataset.id })
-        });
-        if (resp.status === 403) {
-          moderationPin = null;
-          alert('PIN incorrect.');
-        }
-        loadLeaderboard();
-      });
+      btn.addEventListener('click', () => moderer(
+        { id: btn.dataset.id },
+        `Supprimer ce résultat de ${btn.dataset.pseudo} du classement ?`
+      ));
     }
+    for (const btn of document.querySelectorAll('.lb-delete-all')) {
+      btn.addEventListener('click', () => moderer(
+        { pseudo: btn.dataset.pseudo },
+        `Supprimer TOUTES les courses de « ${btn.dataset.pseudo} » (tous les classements) ?`
+      ));
+    }
+  }
+
+  /** Supprime une entrée (ou toutes celles d'un pseudo), avec confirmation. */
+  async function moderer(cible, question) {
+    if (!confirm(question)) return;
+    const resp = await fetch('/api/moderation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: moderationPin, ...cible })
+    });
+    if (resp.status === 403) {
+      moderationPin = null;
+      alert('PIN incorrect.');
+    }
+    loadLeaderboard();
   }
 
   async function showPlayerStats(pseudo) {

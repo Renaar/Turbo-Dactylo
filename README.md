@@ -26,15 +26,17 @@ ligne d'arrivée !
   choisit un nombre de mots et part aussitôt en course contre la montre,
   sans salon ni code. Un chronomètre tourne pendant la course et son
   record personnel (gardé dans son navigateur) lui est rappelé à l'arrivée.
-  Ces entraînements **ne comptent pas dans les classements de classe** :
-  seules les courses encadrées par un enseignant y figurent.
+  Ces entraînements alimentent **leur propre classement**, séparé de celui
+  des classes : seules les courses encadrées par un enseignant figurent
+  dans les classements de classe.
 - **Modération** : l'hôte peut renvoyer un joueur du salon (pseudo
   inapproprié, etc.) d'un clic sur la croix à côté de son nom.
 - **🏆 Classements persistants, sans comptes** : chaque course terminée est
   enregistrée (pseudo, MPM, erreurs, date, classe). La page « Classements »
-  affiche les plus rapides et les plus assidus, filtrables par mode, par
-  période (semaine / mois / toujours) et par classe, plus les statistiques
-  détaillées de chaque joueur. Le champ « Classe » est saisi (optionnellement)
+  affiche les plus rapides et les plus assidus dans **trois classements
+  distincts** — 🏁 courses de classe, 🔥 échauffement et ⏱️ entraînement
+  solo — filtrables par période (semaine / mois / toujours) et par classe,
+  plus les statistiques détaillées de chaque joueur. Le champ « Classe » est saisi (optionnellement)
   à la création du salon. Les élèves doivent **toujours utiliser le même
   pseudo** pour retrouver leurs statistiques (le navigateur le mémorise).
 - **Course en temps réel** : les voitures avancent en direct sur la piste,
@@ -95,8 +97,11 @@ sans attendre personne.
 ## 🛡️ Modération des classements
 
 Pour retirer une entrée du classement (pseudo inapproprié…) : page
-« Classements » → lien **Modération** en bas → saisir le PIN → une croix
-apparaît à côté de chaque entrée. Le PIN par défaut est `turbo` ;
+« Classements » → lien **Modération** en bas → saisir le PIN → deux boutons
+apparaissent à côté de chaque entrée : **✖** supprime ce seul résultat,
+**🗑** supprime *toutes* les courses de ce pseudo, dans tous les classements
+(pratique pour un pseudo déplacé qui s'est entraîné plusieurs fois).
+Le PIN par défaut est `turbo` ;
 **changez-le** en définissant la variable d'environnement `TURBO_PIN` au
 lancement du serveur (`TURBO_PIN=monsecret npm start`).
 

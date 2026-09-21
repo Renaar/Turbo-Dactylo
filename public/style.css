@@ -639,6 +639,19 @@ body.race-mode footer { display: none; }
 }
 
 .lb-filters select { width: auto; min-width: 150px; }
+.lb-filters select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.lb-intro {
+  margin-top: 14px;
+  color: #a29bfe;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* En solo, la colonne « Classe » n'a pas lieu d'être (tables principales
+   seulement : le détail par joueur garde ses colonnes) */
+.leaderboard-box.solo-view > .results-table th:nth-child(3),
+.leaderboard-box.solo-view > .results-table td:nth-child(3) { display: none; }
 
 .lb-pseudo {
   background: none;
