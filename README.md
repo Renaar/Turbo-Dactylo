@@ -22,6 +22,12 @@ ligne d'arrivée !
 - **Mode échauffement** : taper n'importe quels caractères le plus vite
   possible (100 à 400 frappes) — parfait pour délier les doigts en début de
   séance.
+- **⏱️ Entraînement solo** : depuis l'accueil, un élève entre son prénom,
+  choisit un nombre de mots et part aussitôt en course contre la montre,
+  sans salon ni code. Un chronomètre tourne pendant la course et son
+  record personnel (gardé dans son navigateur) lui est rappelé à l'arrivée.
+  Ces entraînements **ne comptent pas dans les classements de classe** :
+  seules les courses encadrées par un enseignant y figurent.
 - **Modération** : l'hôte peut renvoyer un joueur du salon (pseudo
   inapproprié, etc.) d'un clic sur la croix à côté de son nom.
 - **🏆 Classements persistants, sans comptes** : chaque course terminée est
@@ -81,6 +87,10 @@ Un fichier `render.yaml` est fourni pour un déploiement en un clic sur Render.
    faut les corriger pour continuer.
 5. À la fin, le podium et le tableau des scores s'affichent ; l'hôte peut
    relancer une course immédiatement.
+
+Pour s'entraîner seul, un élève saisit son prénom et clique directement sur
+**C'est parti !** dans le panneau « S'entraîner seul » : la course démarre
+sans attendre personne.
 
 ## 🛡️ Modération des classements
 

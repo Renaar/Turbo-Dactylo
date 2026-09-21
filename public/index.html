@@ -35,6 +35,18 @@
           <input id="input-code" type="text" maxlength="5" placeholder="CODE" autocomplete="off">
           <button id="btn-join" class="btn btn-secondary">Rejoindre</button>
         </div>
+        <div class="panel panel-solo">
+          <h2>⏱️ S'entraîner seul</h2>
+          <p>Une course contre la montre, rien que pour toi : bats ton record !</p>
+          <select id="select-solo-count" aria-label="Nombre de mots">
+            <option value="10">10 mots</option>
+            <option value="15">15 mots</option>
+            <option value="20" selected>20 mots</option>
+            <option value="30">30 mots</option>
+            <option value="40">40 mots</option>
+          </select>
+          <button id="btn-solo" class="btn btn-violet">C'est parti !</button>
+        </div>
       </div>
       <p id="home-error" class="error hidden"></p>
       <button id="btn-leaderboard" class="btn btn-gold">🏆 Voir les classements</button>
@@ -96,6 +108,7 @@
     <div class="typing-zone">
       <div class="race-info">
         <span id="race-progress">Mot 0 / 0</span>
+        <span id="race-chrono" class="hidden">0.0 s</span>
         <span id="race-wpm">0 MPM</span>
       </div>
       <div id="word-display" class="word-display"></div>
@@ -116,7 +129,8 @@
   <!-- Écran des résultats -->
   <section id="screen-results" class="screen">
     <div class="results-box">
-      <h1>🏆 Résultats de la course</h1>
+      <h1 id="results-title">🏆 Résultats de la course</h1>
+      <p id="solo-record" class="solo-record hidden"></p>
       <div id="podium" class="podium"></div>
       <table class="results-table">
         <thead>
@@ -124,6 +138,16 @@
         </thead>
         <tbody id="results-body"></tbody>
       </table>
+      <div id="solo-again" class="solo-again hidden">
+        <label for="select-solo-count-2">Prochaine course</label>
+        <select id="select-solo-count-2">
+          <option value="10">10 mots</option>
+          <option value="15">15 mots</option>
+          <option value="20" selected>20 mots</option>
+          <option value="30">30 mots</option>
+          <option value="40">40 mots</option>
+        </select>
+      </div>
       <button id="btn-replay" class="btn btn-primary btn-big hidden">🔄 Rejouer</button>
       <p id="replay-wait" class="waiting-msg hidden">En attente d'une nouvelle course…</p>
       <button id="btn-leave-results" class="btn btn-link">Quitter le salon</button>

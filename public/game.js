@@ -49,6 +49,14 @@
   const inputTyping = $('input-typing');
   const raceProgress = $('race-progress');
   const raceWpm = $('race-wpm');
+  const raceChrono = $('race-chrono');
+  const selectSoloCount = $('select-solo-count');
+  const selectSoloCount2 = $('select-solo-count-2');
+  const soloAgain = $('solo-again');
+  const soloRecord = $('solo-record');
+  const resultsTitle = $('results-title');
+  let chronoTimer = null;
+  let chronoStart = 0;
   const spectatorMsg = $('spectator-msg');
   const btnEndRace = $('btn-end-race');
   const countdownOverlay = $('countdown-overlay');
@@ -89,6 +97,7 @@
     ws.onopen = onOpen;
     ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
     ws.onclose = () => {
+      stopChrono();
       if (myId !== null) {
         showError('Connexion perdue. Recharge la page pour rejouer.');
       }
@@ -128,6 +137,8 @@
       case 'lobby':
         lobby = msg;
         renderLobby();
+        // En solo il n'y a pas de salle d'attente : la course enchaîne seule
+        if (msg.solo) break;
         if (msg.status === 'waiting') {
           // Retour au salon depuis n'importe quel écran (accueil, course, résultats)
           showScreen('lobby');
@@ -162,6 +173,7 @@
         showScreen('race');
         countdownOverlay.classList.add('hidden');
         layoutTrack();
+        if (lobby && lobby.solo) startChrono();
         if (!race.spectator) {
           inputTyping.disabled = false;
           inputTyping.value = '';
@@ -225,7 +237,8 @@
     waitingMsg.classList.toggle('hidden', isHost);
     btnReplay.classList.toggle('hidden', !isHost);
     replayWait.classList.toggle('hidden', isHost);
-    btnEndRace.classList.toggle('hidden', !isHost);
+    // En solo, pas de bouton « terminer pour tout le monde »
+    btnEndRace.classList.toggle('hidden', !isHost || lobby.solo);
 
     playerList.innerHTML = '';
     for (const p of lobby.players) {
@@ -276,12 +289,31 @@
     // L'organisateur a son bouton dans le coin ; seul le spectateur
     // retardataire a besoin d'une explication.
     spectatorMsg.classList.toggle('hidden', !race.spectator || isHost);
+    stopChrono();
+    raceChrono.classList.toggle('hidden', !(lobby && lobby.solo));
+    raceChrono.textContent = '0.0 s';
     wordDisplay.innerHTML = race.spectator ? '' : '…';
     raceProgress.textContent = race.mode === 'echauffement'
       ? `0 / ${race.target} frappes`
       : `Mot 0 / ${race.words.length}`;
     raceWpm.textContent = '0 MPM';
     buildTrack();
+  }
+
+  // --- Chronomètre (course solo contre la montre) -------------------------
+  function startChrono() {
+    stopChrono();
+    chronoStart = Date.now();
+    raceChrono.classList.remove('hidden');
+    raceChrono.textContent = '0.0 s';
+    chronoTimer = setInterval(() => {
+      raceChrono.textContent = `${((Date.now() - chronoStart) / 1000).toFixed(1)} s`;
+    }, 100);
+  }
+
+  function stopChrono() {
+    if (chronoTimer) clearInterval(chronoTimer);
+    chronoTimer = null;
   }
 
   function renderWarmup() {
@@ -402,6 +434,7 @@
       renderWarmup();
       if (race.typed >= race.target) {
         inputTyping.disabled = true;
+        stopChrono();
         wordDisplay.innerHTML = '🏁 Terminé !';
       }
       return;
@@ -428,6 +461,7 @@
       renderWord('');
       if (race.index >= race.words.length) {
         inputTyping.disabled = true;
+        stopChrono();
         raceProgress.textContent = `Mot ${race.words.length} / ${race.words.length}`;
       }
     } else {
@@ -446,6 +480,16 @@
   // --- Résultats -----------------------------------------------------------------
   function showResults(results) {
     showScreen('results');
+    stopChrono();
+    const solo = !!(lobby && lobby.solo);
+    resultsTitle.textContent = solo ? '⏱️ Ta course solo' : '🏆 Résultats de la course';
+    soloAgain.classList.toggle('hidden', !solo);
+    podium.classList.toggle('hidden', solo);
+    btnReplay.textContent = solo ? '🔄 Nouvelle course' : '🔄 Rejouer';
+    $('btn-leave-results').textContent = solo ? "Retour à l'accueil" : 'Quitter le salon';
+    if (solo) showSoloRecord(results.find((r) => r.id === myId));
+    else soloRecord.classList.add('hidden');
+
     podium.innerHTML = '';
     const finishers = results.filter((r) => r.finished).slice(0, 3);
     const order = [1, 0, 2]; // 2e, 1er, 3e — disposition d'un podium
@@ -485,6 +529,34 @@
     }
   }
 
+  /**
+   * Record personnel de l'entraînement solo, gardé dans le navigateur
+   * (par pseudo, pour que plusieurs élèves puissent partager un poste).
+   */
+  function showSoloRecord(me) {
+    soloRecord.classList.remove('hidden');
+    if (!me || !me.finished) {
+      soloRecord.textContent = 'Course interrompue — réessaie quand tu veux !';
+      return;
+    }
+    const key = `turbo-record-${inputName.value.trim().toLowerCase()}`;
+    let best = 0;
+    try { best = parseInt(localStorage.getItem(key), 10) || 0; } catch { /* ignore */ }
+
+    if (me.wpm > best) {
+      soloRecord.textContent = best
+        ? `🏅 Nouveau record personnel : ${me.wpm} MPM (ancien : ${best} MPM)`
+        : `🏅 Premier résultat enregistré : ${me.wpm} MPM. À toi de le battre !`;
+      soloRecord.classList.add('record');
+      try { localStorage.setItem(key, String(me.wpm)); } catch { /* ignore */ }
+    } else {
+      soloRecord.classList.remove('record');
+      const manque = best - me.wpm;
+      soloRecord.textContent =
+        `Ton record : ${best} MPM · cette course : ${me.wpm} MPM (${manque} de moins)`;
+    }
+  }
+
   // --- Utilitaires ------------------------------------------------------------------
   function ordinal(n) {
     return n === 1 ? '1er' : `${n}e`;
@@ -501,12 +573,18 @@
   try {
     inputName.value = localStorage.getItem('turbo-pseudo') || '';
     inputClasse.value = localStorage.getItem('turbo-classe') || '';
+    const soloCount = localStorage.getItem('turbo-solo-count');
+    if (soloCount && [...selectSoloCount.options].some((o) => o.value === soloCount)) {
+      selectSoloCount.value = soloCount;
+      selectSoloCount2.value = soloCount;
+    }
   } catch { /* stockage local indisponible : tant pis */ }
 
   function rememberMe(name) {
     try {
       localStorage.setItem('turbo-pseudo', name);
       localStorage.setItem('turbo-classe', inputClasse.value.trim());
+      localStorage.setItem('turbo-solo-count', selectSoloCount.value);
     } catch { /* ignore */ }
   }
 
@@ -532,6 +610,17 @@
     connect(() => sendMsg({ type: 'join', name, code }));
   }
 
+  // --- Entraînement solo ---------------------------------------------------
+  $('btn-solo').addEventListener('click', startSolo);
+  function startSolo() {
+    const name = inputName.value.trim();
+    if (!name) return showError('Choisis un pseudo avant de t\'entraîner.');
+    rememberMe(name);
+    const wordCount = parseInt(selectSoloCount.value, 10);
+    selectSoloCount2.value = String(wordCount);
+    connect(() => sendMsg({ type: 'solo', name, wordCount }));
+  }
+
   selectMode.addEventListener('change', sendOptions);
   selectCount.addEventListener('change', sendOptions);
   selectChars.addEventListener('change', sendOptions);
@@ -545,11 +634,19 @@
   }
 
   btnStart.addEventListener('click', () => sendMsg({ type: 'start' }));
-  btnReplay.addEventListener('click', () => sendMsg({ type: 'replay' }));
+  btnReplay.addEventListener('click', () => {
+    const wordCount = parseInt(selectSoloCount2.value, 10);
+    if (lobby && lobby.solo) {
+      selectSoloCount.value = String(wordCount);
+      try { localStorage.setItem('turbo-solo-count', String(wordCount)); } catch { /* ignore */ }
+    }
+    sendMsg({ type: 'replay', wordCount });
+  });
   btnEndRace.addEventListener('click', () => sendMsg({ type: 'end_race' }));
   inputTyping.addEventListener('input', onTyping);
 
   function leave() {
+    stopChrono();
     sendMsg({ type: 'leave' });
     if (ws) ws.close();
     ws = null;

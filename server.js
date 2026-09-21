@@ -93,6 +93,7 @@ const CAR_COLORS = [
 ];
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_PLAYERS = 40;
+const WORD_COUNTS = [10, 15, 20, 30, 40];
 
 const lobbies = new Map(); // code -> lobby
 let nextPlayerId = 1;
@@ -127,6 +128,7 @@ function lobbyState(lobby) {
     status: lobby.status,
     options: lobby.options,
     classe: lobby.classe,
+    solo: !!lobby.solo,
     players: [...lobby.players.values()].map((p) => ({
       id: p.id,
       name: p.name,
@@ -182,8 +184,9 @@ function startRace(lobby) {
     tick: null
   };
   for (const p of lobby.players.values()) {
-    // L'hôte organise la course mais n'y participe pas
-    p.spectator = p.id === lobby.hostId;
+    // L'hôte organise la course mais n'y participe pas — sauf en solo,
+    // où il est le seul joueur.
+    p.spectator = !lobby.solo && p.id === lobby.hostId;
     resetPlayerRace(p);
   }
   broadcast(lobby, lobbyState(lobby));
@@ -248,6 +251,10 @@ function endRace(lobby) {
     });
   broadcast(lobby, { type: 'results', results });
   broadcast(lobby, lobbyState(lobby));
+
+  // Les entraînements solo ne sont pas enregistrés : le classement de
+  // classe ne récompense que les courses organisées par un enseignant.
+  if (lobby.solo) return;
 
   // Enregistre les courses terminées dans le leaderboard
   db.add(results
@@ -320,33 +327,42 @@ wss.on('connection', (ws) => {
 
     switch (msg.type) {
       case 'create':
-      case 'join': {
+      case 'join':
+      case 'solo': {
         if (player) return;
         const name = String(msg.name || '').trim().slice(0, 20);
         if (!name) return send(ws, { type: 'error', message: 'Choisis un pseudo.' });
 
-        if (msg.type === 'create') {
-          lobby = {
-            code: makeCode(),
-            hostId: null,
-            status: 'waiting',
-            options: { mode: 'mots', wordCount: 20, charCount: 200 },
-            classe: String(msg.classe || '').trim().slice(0, 20),
-            players: new Map(),
-            race: null,
-            countdownTimer: null
-          };
-          lobbies.set(lobby.code, lobby);
-        } else {
+        if (msg.type === 'join') {
           const code = String(msg.code || '').trim().toUpperCase();
           lobby = lobbies.get(code);
-          if (!lobby) {
+          // Un entraînement solo n'est jamais rejoignable
+          if (!lobby || lobby.solo) {
+            lobby = null;
             return send(ws, { type: 'error', message: 'Salon introuvable. Vérifie le code.' });
           }
           if (lobby.players.size >= MAX_PLAYERS) {
             lobby = null;
             return send(ws, { type: 'error', message: 'Ce salon est complet.' });
           }
+        } else {
+          const solo = msg.type === 'solo';
+          lobby = {
+            code: makeCode(),
+            hostId: null,
+            status: 'waiting',
+            solo,
+            options: {
+              mode: 'mots',
+              wordCount: WORD_COUNTS.includes(msg.wordCount) ? msg.wordCount : 20,
+              charCount: 200
+            },
+            classe: solo ? '' : String(msg.classe || '').trim().slice(0, 20),
+            players: new Map(),
+            race: null,
+            countdownTimer: null
+          };
+          lobbies.set(lobby.code, lobby);
         }
 
         player = {
@@ -362,7 +378,10 @@ wss.on('connection', (ws) => {
 
         send(ws, { type: 'welcome', playerId: player.id, code: lobby.code });
         broadcast(lobby, lobbyState(lobby));
-        if (player.spectator && lobby.race) {
+        // L'entraînement solo démarre sans salle d'attente
+        if (lobby.solo) {
+          startRace(lobby);
+        } else if (player.spectator && lobby.race) {
           send(ws, {
             type: 'race_setup',
             mode: lobby.race.mode,
@@ -378,7 +397,7 @@ wss.on('connection', (ws) => {
         if (!lobby || player.id !== lobby.hostId || lobby.status !== 'waiting') return;
         const mode = ['mots', 'echauffement'].includes(msg.mode)
           ? msg.mode : lobby.options.mode;
-        const wordCount = [10, 15, 20, 30, 40].includes(msg.wordCount)
+        const wordCount = WORD_COUNTS.includes(msg.wordCount)
           ? msg.wordCount : lobby.options.wordCount;
         const charCount = [100, 200, 300, 400].includes(msg.charCount)
           ? msg.charCount : lobby.options.charCount;
@@ -463,7 +482,13 @@ wss.on('connection', (ws) => {
 
       case 'replay': {
         if (!lobby || player.id !== lobby.hostId || lobby.status !== 'results') return;
-        backToLobby(lobby);
+        if (lobby.solo) {
+          // En solo on relance aussitôt, avec le nombre de mots choisi
+          if (WORD_COUNTS.includes(msg.wordCount)) lobby.options.wordCount = msg.wordCount;
+          startRace(lobby);
+        } else {
+          backToLobby(lobby);
+        }
         break;
       }
 

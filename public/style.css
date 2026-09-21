@@ -107,7 +107,7 @@ input[type="text"]:focus, select:focus { border-color: #3498db; }
 
 .home-box {
   width: 100%;
-  max-width: 640px;
+  max-width: 900px;
   margin-top: 5vh;
 }
 
@@ -131,13 +131,17 @@ input[type="text"]:focus, select:focus { border-color: #3498db; }
 
 .home-panels {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 880px) {
   .home-panels { grid-template-columns: 1fr; }
 }
+
+.panel-solo { border-color: #6c5ce7aa; }
+
+.btn-violet { background: #a29bfe; color: #1b1440; }
 
 .panel {
   background: #16244233;
@@ -529,6 +533,35 @@ body.race-mode footer { display: none; }
   margin-top: 3vh;
   text-align: center;
 }
+
+/* Course solo : chronomètre et record personnel */
+#race-chrono {
+  color: #ffd166;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+}
+
+.solo-record {
+  margin-top: 10px;
+  font-weight: 600;
+  color: #aebcd6;
+}
+
+.solo-record.record {
+  color: #ffd166;
+  font-size: 1.15rem;
+}
+
+.solo-again {
+  margin-top: 18px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+}
+
+.solo-again label { color: #aebcd6; font-size: 0.9rem; }
+.solo-again select { width: auto; min-width: 140px; }
 
 .podium {
   display: flex;
