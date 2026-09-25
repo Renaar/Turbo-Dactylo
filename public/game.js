@@ -99,7 +99,10 @@
   // --- WebSocket ------------------------------------------------------------
   function connect(onOpen) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${proto}://${location.host}`);
+    // Chemin du dossier de la page : le jeu marche aussi sous un sous-chemin
+    // (ex. /dactylo/) derrière un reverse proxy.
+    const dir = location.pathname.replace(/[^/]*$/, '');
+    ws = new WebSocket(`${proto}://${location.host}${dir}`);
     ws.onopen = onOpen;
     ws.onmessage = (e) => handleMessage(JSON.parse(e.data));
     ws.onclose = () => {
@@ -809,7 +812,7 @@
     });
     let data;
     try {
-      data = await (await fetch(`/api/classements?${params}`)).json();
+      data = await (await fetch(`api/classements?${params}`)).json();
     } catch {
       $('lb-empty').classList.remove('hidden');
       return;
@@ -890,7 +893,7 @@
   /** Supprime une entrée (ou toutes celles d'un pseudo), avec confirmation. */
   async function moderer(cible, question) {
     if (!confirm(question)) return;
-    const resp = await fetch('/api/moderation', {
+    const resp = await fetch('api/moderation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pin: moderationPin, ...cible })
@@ -904,7 +907,7 @@
 
   async function showPlayerStats(pseudo) {
     const params = new URLSearchParams({ pseudo, mode: lbMode.value });
-    const resp = await fetch(`/api/joueur?${params}`);
+    const resp = await fetch(`api/joueur?${params}`);
     if (!resp.ok) return;
     const s = await resp.json();
     $('lb-player-title').textContent = `📊 Statistiques de ${s.pseudo}`;

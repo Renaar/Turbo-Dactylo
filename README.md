@@ -116,7 +116,11 @@ lancement du serveur (`TURBO_PIN=monsecret npm start`).
 
 - Serveur : Node.js + [`ws`](https://github.com/websockets/ws) (WebSockets),
   aucune autre dépendance.
-- Client : HTML/CSS/JavaScript sans framework.
+- Client : HTML/CSS/JavaScript sans framework. Tous les chemins (API,
+  WebSocket, fichiers) sont relatifs : le jeu fonctionne aussi bien à la
+  racine (`http://localhost:3000/`) que sous un sous-chemin derrière un
+  reverse proxy (par exemple `http://serveur/dactylo/`, préfixe retiré par
+  le proxy).
 - Les mots sont validés côté serveur : la progression des voitures est
   calculée sur le serveur pour éviter la triche.
 - La banque de mots se modifie facilement dans [`words.js`](words.js)
