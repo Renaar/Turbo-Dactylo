@@ -250,10 +250,13 @@ body.race-mode footer { display: none; }
   min-height: 0;
 }
 
+/* La pelouse : deux teintes en bandes alternées. En course par équipes,
+   elle prend la couleur de l'équipe du joueur (voir paintLawn). */
 .track {
-  background: #3d8b40;
+  background: var(--lawn-a, #3d8b40);
   background-image: repeating-linear-gradient(90deg,
-    #3d8b40 0, #3d8b40 40px, #388438 40px, #388438 80px);
+    var(--lawn-a, #3d8b40) 0, var(--lawn-a, #3d8b40) 40px,
+    var(--lawn-b, #388438) 40px, var(--lawn-b, #388438) 80px);
   border-radius: 14px;
   padding: 14px 0;
   overflow-y: auto;
@@ -367,6 +370,10 @@ body.race-mode footer { display: none; }
   color: #ffffffbb;
   text-shadow: 0 1px 3px #000;
 }
+
+/* Mode équipe : « ⬅ toi » passe sous le nom de l'équipe pour ne pas être
+   tronqué par la gouttière */
+.lane .lane-you { color: #ffd166; font-weight: 800; }
 
 /* Mode équipe : les prénoms des équipiers s'affichent en haut du couloir */
 .lane .lane-members {

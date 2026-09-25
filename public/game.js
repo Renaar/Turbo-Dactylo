@@ -329,12 +329,37 @@
       raceTeam.textContent = `${race.myTeam.emoji} ${race.myTeam.name}`;
       raceTeam.style.color = race.myTeam.color;
     }
+    // Immersion : la pelouse prend la couleur de l'équipe du joueur
+    // (l'organisateur et les spectateurs gardent la pelouse verte)
+    paintLawn(race.myTeam);
     wordDisplay.innerHTML = race.spectator ? '' : '…';
     raceProgress.textContent = race.mode === 'echauffement'
       ? `0 / ${race.target} frappes`
       : `Mot 0 / ${race.words.length}`;
     raceWpm.textContent = '0 MPM';
     buildTrack();
+  }
+
+  /**
+   * Teinte de pelouse dérivée d'une couleur d'équipe : on l'assombrit vers
+   * un gris foncé pour garder l'aspect d'un gazon tondu plutôt qu'un aplat
+   * criard. Les deux bandes ne diffèrent que légèrement, comme la pelouse
+   * verte d'origine.
+   */
+  function lawnShade(hex, ratio) {
+    const n = parseInt(hex.slice(1), 16);
+    const mix = (c) => Math.round(c * ratio + 0x1a * (1 - ratio));
+    return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+  }
+
+  function paintLawn(team) {
+    if (team) {
+      trackEl.style.setProperty('--lawn-a', lawnShade(team.color, 0.62));
+      trackEl.style.setProperty('--lawn-b', lawnShade(team.color, 0.57));
+    } else {
+      trackEl.style.removeProperty('--lawn-a');
+      trackEl.style.removeProperty('--lawn-b');
+    }
   }
 
   // --- Chronomètre (course solo contre la montre) -------------------------
@@ -372,7 +397,7 @@
         lane.className = 'lane';
         lane.dataset.teamIndex = t.index;
         lane.innerHTML = `
-          <span class="lane-name">${t.emoji} ${escapeHTML(t.name)}${mine ? ' ⬅ toi' : ''}</span>
+          <span class="lane-name">${t.emoji} ${escapeHTML(t.name)}${mine ? '<br><span class="lane-you">⬅ toi</span>' : ''}</span>
           <span class="lane-wpm"></span>
           <span class="lane-members">${t.members.map((m) => escapeHTML(m.name)).join(' · ')}</span>
           <div class="start-line"></div>
