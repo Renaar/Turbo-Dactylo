@@ -9,6 +9,8 @@
   let lobby = null; // dernier état "lobby" reçu du serveur
   let race = {
     mode: 'mots',
+    teams: null,   // composition des équipes, ou null (chacun pour soi)
+    myTeam: null,
     words: [],
     target: 0,
     typed: 0,
@@ -40,8 +42,12 @@
   const selectMode = $('select-mode');
   const selectCount = $('select-count');
   const selectChars = $('select-chars');
+  const selectTeams = $('select-teams');
   const optWords = $('opt-words');
   const optChars = $('opt-chars');
+  const raceTeam = $('race-team');
+  const countdownTeam = $('countdown-team');
+  const teamResults = $('team-results');
   const btnStart = $('btn-start');
   const waitingMsg = $('waiting-msg');
   const trackEl = $('track');
@@ -150,6 +156,10 @@
 
       case 'race_setup': {
         race.mode = msg.mode || 'mots';
+        race.teams = msg.teams || null;
+        race.myTeam = race.teams
+          ? race.teams.find((t) => t.members.some((m) => m.id === myId)) || null
+          : null;
         race.words = msg.words || [];
         race.target = msg.target || 0;
         race.typed = 0;
@@ -167,6 +177,15 @@
         layoutTrack();
         countdownOverlay.classList.remove('hidden');
         countdownNumber.textContent = msg.n;
+        // Chacun découvre son équipe pendant le décompte
+        countdownTeam.classList.toggle('hidden', !race.myTeam);
+        if (race.myTeam) {
+          countdownTeam.style.color = race.myTeam.color;
+          countdownTeam.textContent = race.spectator
+            ? `${race.teams.length} équipes tirées au sort !`
+            : `${race.myTeam.emoji} Tu cours pour les ${race.myTeam.name} : `
+              + race.myTeam.members.map((m) => m.name).join(', ');
+        }
         break;
 
       case 'go':
@@ -196,15 +215,23 @@
         break;
 
       case 'progress':
-        updateTrack(msg.players);
+        updateTrack(msg.players, msg.teams);
         break;
 
       case 'player_finished':
         announceFinish(msg);
         break;
 
+      case 'team_finished':
+        finishBanner.textContent = race.myTeam && race.myTeam.index === msg.index
+          ? `🎉 Ton équipe, les ${msg.name}, termine ${ordinal(msg.rank)} !`
+          : `${msg.emoji} Les ${msg.name} terminent ${ordinal(msg.rank)} !`;
+        finishBanner.classList.remove('hidden');
+        setTimeout(() => finishBanner.classList.add('hidden'), 3500);
+        break;
+
       case 'results':
-        showResults(msg.results);
+        showResults(msg.results, msg.teams);
         break;
     }
   }
@@ -222,12 +249,16 @@
       selectMode.value = opts.mode;
       selectCount.value = String(opts.wordCount);
       selectChars.value = String(opts.charCount);
+      selectTeams.value = String(opts.teams || 0);
       optWords.classList.toggle('hidden', opts.mode === 'echauffement');
       optChars.classList.toggle('hidden', opts.mode !== 'echauffement');
     } else {
-      guestOptions.textContent = opts.mode === 'echauffement'
+      const format = opts.mode === 'echauffement'
         ? `🔥 Échauffement · ${opts.charCount} frappes`
         : `🏁 Course de ${opts.wordCount} mots`;
+      guestOptions.textContent = opts.teams >= 2
+        ? `${format} · 🤝 ${opts.teams} équipes tirées au sort`
+        : format;
     }
 
     btnStart.classList.toggle('hidden', !isHost);
@@ -292,6 +323,12 @@
     stopChrono();
     raceChrono.classList.toggle('hidden', !(lobby && lobby.solo));
     raceChrono.textContent = '0.0 s';
+    // Rappel permanent de son équipe pendant la course
+    raceTeam.classList.toggle('hidden', !race.myTeam || race.spectator);
+    if (race.myTeam) {
+      raceTeam.textContent = `${race.myTeam.emoji} ${race.myTeam.name}`;
+      raceTeam.style.color = race.myTeam.color;
+    }
     wordDisplay.innerHTML = race.spectator ? '' : '…';
     raceProgress.textContent = race.mode === 'echauffement'
       ? `0 / ${race.target} frappes`
@@ -325,6 +362,28 @@
   function buildTrack() {
     trackEl.innerHTML = '';
     if (!lobby) return;
+
+    // En mode équipe, une piste par équipe : la voiture avance à la
+    // progression moyenne de ses membres.
+    if (race.teams) {
+      for (const t of race.teams) {
+        const mine = race.myTeam && race.myTeam.index === t.index;
+        const lane = document.createElement('div');
+        lane.className = 'lane';
+        lane.dataset.teamIndex = t.index;
+        lane.innerHTML = `
+          <span class="lane-name">${t.emoji} ${escapeHTML(t.name)}${mine ? ' ⬅ toi' : ''}</span>
+          <span class="lane-wpm"></span>
+          <span class="lane-members">${t.members.map((m) => escapeHTML(m.name)).join(' · ')}</span>
+          <div class="start-line"></div>
+          <div class="finish-line"></div>
+          <div class="car">${carSVG(t.color)}</div>`;
+        trackEl.appendChild(lane);
+      }
+      layoutTrack();
+      return;
+    }
+
     for (const p of lobby.players) {
       if (p.spectator) continue;
       const lane = document.createElement('div');
@@ -356,15 +415,21 @@
     const zone = document.querySelector('.typing-zone');
     if (zone.offsetParent) avail -= zone.getBoundingClientRect().height + 18;
 
-    const laneH = Math.max(28, Math.min(52, Math.floor(avail / lanes.length)));
+    // Peu de couloirs en mode équipe : on peut les faire plus grands
+    const maxLane = race.teams ? 140 : 52;
+    const maxCar = race.teams ? 86 : 46;
+    const laneH = Math.max(28, Math.min(maxLane, Math.floor(avail / lanes.length)));
     trackEl.style.setProperty('--lane-h', `${laneH}px`);
-    trackEl.style.setProperty('--car-w', `${Math.round(Math.max(26, Math.min(46, laneH * 0.9)))}px`);
+    trackEl.style.setProperty('--car-w',
+      `${Math.round(Math.max(26, Math.min(maxCar, laneH * 0.85)))}px`);
     trackEl.classList.toggle('compact', laneH < 42);
 
     // Si la piste déborde malgré tout, le joueur doit au moins voir sa
     // propre voiture : on la recentre dans la piste.
     if (!race.spectator && myId !== null) {
-      const mine = trackEl.querySelector(`.lane[data-player-id="${myId}"]`);
+      const mine = trackEl.querySelector(race.teams && race.myTeam
+        ? `.lane[data-team-index="${race.myTeam.index}"]`
+        : `.lane[data-player-id="${myId}"]`);
       if (mine) {
         const laneBox = mine.getBoundingClientRect();
         const trackBox = trackEl.getBoundingClientRect();
@@ -376,7 +441,25 @@
 
   window.addEventListener('resize', layoutTrack);
 
-  function updateTrack(players) {
+  function updateTrack(players, teams) {
+    // Ma vitesse personnelle reste affichée dans tous les modes
+    const me = players.find((p) => p.id === myId);
+    if (me) raceWpm.textContent = `${me.wpm} MPM`;
+
+    if (teams) {
+      for (const t of teams) {
+        const lane = trackEl.querySelector(`.lane[data-team-index="${t.index}"]`);
+        if (!lane) continue;
+        const car = lane.querySelector('.car');
+        car.style.left = `${2 + t.progress * 86}%`;
+        car.classList.toggle('finished', t.finishedCount === t.total);
+        lane.querySelector('.lane-wpm').textContent = t.rank
+          ? `🏁 ${ordinal(t.rank)}`
+          : `${Math.round(t.progress * 100)} %`;
+      }
+      return;
+    }
+
     for (const p of players) {
       const lane = trackEl.querySelector(`.lane[data-player-id="${p.id}"]`);
       if (!lane) continue;
@@ -387,9 +470,6 @@
       car.classList.toggle('disconnected', p.disconnected);
       const wpmEl = lane.querySelector('.lane-wpm');
       wpmEl.textContent = p.finished ? `🏁 ${ordinal(p.rank)}` : `${p.wpm} MPM`;
-      if (p.id === myId) {
-        raceWpm.textContent = `${p.wpm} MPM`;
-      }
     }
   }
 
@@ -478,13 +558,17 @@
   }
 
   // --- Résultats -----------------------------------------------------------------
-  function showResults(results) {
+  function showResults(results, teams) {
     showScreen('results');
     stopChrono();
     const solo = !!(lobby && lobby.solo);
-    resultsTitle.textContent = solo ? '⏱️ Ta course solo' : '🏆 Résultats de la course';
+    resultsTitle.textContent = solo
+      ? '⏱️ Ta course solo'
+      : (teams ? '🤝 Résultats par équipes' : '🏆 Résultats de la course');
+    renderTeamResults(teams);
     soloAgain.classList.toggle('hidden', !solo);
-    podium.classList.toggle('hidden', solo);
+    // En équipe, le classement des équipes tient lieu de podium
+    podium.classList.toggle('hidden', solo || !!teams);
     btnReplay.textContent = solo ? '🔄 Nouvelle course' : '🔄 Rejouer';
     $('btn-leave-results').textContent = solo ? "Retour à l'accueil" : 'Quitter le salon';
     if (solo) showSoloRecord(results.find((r) => r.id === myId));
@@ -512,9 +596,12 @@
       const tr = document.createElement('tr');
       const rank = r.finished ? ordinal(r.rank) : '—';
       const time = r.time !== null ? `${r.time.toFixed(1)} s` : '—';
+      // En équipe, on rappelle la couleur de l'équipe de chacun
+      const equipe = teams && r.team !== null && race.teams
+        ? (race.teams.find((t) => t.index === r.team)?.emoji || '') + ' ' : '';
       tr.innerHTML = `
         <td>${rank}</td>
-        <td class="player-cell">${carSVG(r.color, 30)} ${escapeHTML(r.name)}${r.id === myId ? ' (toi)' : ''}</td>
+        <td class="player-cell">${carSVG(r.color, 30)} ${equipe}${escapeHTML(r.name)}${r.id === myId ? ' (toi)' : ''}</td>
         <td>${time}</td>
         <td>${r.wpm}</td>
         <td>${warmup ? '—' : r.mistakes}</td>
@@ -527,6 +614,27 @@
       btnReplay.classList.toggle('hidden', !isHost);
       replayWait.classList.toggle('hidden', isHost);
     }
+  }
+
+  /** Classement des équipes, en tête des résultats. */
+  function renderTeamResults(teams) {
+    teamResults.classList.toggle('hidden', !teams);
+    teamResults.innerHTML = '';
+    if (!teams) return;
+    const medals = ['🥇', '🥈', '🥉', '4e'];
+    teams.forEach((t, i) => {
+      const mine = race.myTeam && race.myTeam.index === t.index;
+      const card = document.createElement('div');
+      card.className = 'team-card' + (mine ? ' mine' : '');
+      card.style.borderColor = t.color;
+      card.innerHTML = `
+        <div class="team-rank">${medals[i] || i + 1}</div>
+        <div class="team-car">${carSVG(t.color, 54)}</div>
+        <div class="team-name" style="color:${t.color}">${t.emoji} ${escapeHTML(t.name)}</div>
+        <div class="team-detail">${Math.round(t.progress * 100)} % · ${t.wpm} MPM</div>
+        <div class="team-detail">${t.finishedCount}/${t.total} arrivés</div>`;
+      teamResults.appendChild(card);
+    });
   }
 
   /**
@@ -624,12 +732,14 @@
   selectMode.addEventListener('change', sendOptions);
   selectCount.addEventListener('change', sendOptions);
   selectChars.addEventListener('change', sendOptions);
+  selectTeams.addEventListener('change', sendOptions);
   function sendOptions() {
     sendMsg({
       type: 'options',
       mode: selectMode.value,
       wordCount: parseInt(selectCount.value, 10),
-      charCount: parseInt(selectChars.value, 10)
+      charCount: parseInt(selectChars.value, 10),
+      teams: parseInt(selectTeams.value, 10)
     });
   }
 

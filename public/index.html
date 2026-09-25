@@ -79,6 +79,15 @@
             <option value="40">40 mots</option>
           </select>
         </div>
+        <div class="option" id="opt-teams">
+          <label for="select-teams">Équipes</label>
+          <select id="select-teams">
+            <option value="0" selected>👤 Chacun pour soi</option>
+            <option value="2">🤝 2 équipes</option>
+            <option value="3">🤝 3 équipes</option>
+            <option value="4">🤝 4 équipes</option>
+          </select>
+        </div>
         <div class="option hidden" id="opt-chars">
           <label for="select-chars">Nombre de frappes</label>
           <select id="select-chars">
@@ -108,6 +117,7 @@
     <div class="typing-zone">
       <div class="race-info">
         <span id="race-progress">Mot 0 / 0</span>
+        <span id="race-team" class="hidden"></span>
         <span id="race-chrono" class="hidden">0.0 s</span>
         <span id="race-wpm">0 MPM</span>
       </div>
@@ -122,6 +132,7 @@
 
     <div id="countdown-overlay" class="countdown-overlay hidden">
       <div id="countdown-number">3</div>
+      <p id="countdown-team" class="countdown-team hidden"></p>
     </div>
     <div id="finish-banner" class="finish-banner hidden"></div>
   </section>
@@ -131,6 +142,7 @@
     <div class="results-box">
       <h1 id="results-title">🏆 Résultats de la course</h1>
       <p id="solo-record" class="solo-record hidden"></p>
+      <div id="team-results" class="team-results hidden"></div>
       <div id="podium" class="podium"></div>
       <table class="results-table">
         <thead>

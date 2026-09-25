@@ -368,6 +368,22 @@ body.race-mode footer { display: none; }
   text-shadow: 0 1px 3px #000;
 }
 
+/* Mode équipe : les prénoms des équipiers s'affichent en haut du couloir */
+.lane .lane-members {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.7rem;
+  color: #ffffff77;
+  z-index: 1;
+  pointer-events: none;
+}
+
 /* Couloirs resserrés (classe nombreuse) : étiquettes un peu plus petites */
 .track.compact .lane-name { font-size: 0.62rem; }
 .track.compact .lane-wpm { font-size: 0.6rem; }
@@ -498,6 +514,18 @@ body.race-mode footer { display: none; }
   z-index: 50;
 }
 
+.countdown-team {
+  position: absolute;
+  bottom: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90%;
+  text-align: center;
+  font-size: 1.3rem;
+  font-weight: 800;
+  text-shadow: 0 2px 8px #000;
+}
+
 #countdown-number {
   font-size: 9rem;
   font-weight: 900;
@@ -533,6 +561,34 @@ body.race-mode footer { display: none; }
   margin-top: 3vh;
   text-align: center;
 }
+
+/* Mode équipe : badge pendant la course et classement des équipes */
+#race-team {
+  font-weight: 800;
+  text-shadow: 0 1px 3px #000;
+}
+
+.team-results {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 22px 0 10px;
+}
+
+.team-card {
+  border: 2px solid #33456b;
+  border-radius: 14px;
+  padding: 12px 16px;
+  min-width: 140px;
+  background: #16244255;
+}
+
+.team-card.mine { background: #ffd1661a; box-shadow: 0 0 0 2px #ffd16655; }
+.team-card .team-rank { font-size: 1.6rem; font-weight: 900; }
+.team-card .team-car { display: flex; justify-content: center; margin: 4px 0; }
+.team-card .team-name { font-weight: 800; }
+.team-card .team-detail { color: #aebcd6; font-size: 0.85rem; }
 
 /* Course solo : chronomètre et record personnel */
 #race-chrono {

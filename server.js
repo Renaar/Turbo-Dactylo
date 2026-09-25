@@ -105,6 +105,15 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const MAX_PLAYERS = 40;
 const WORD_COUNTS = [10, 15, 20, 30, 40];
 
+// Course par équipes : 0 = chacun pour soi, sinon 2 à 4 équipes
+const TEAM_COUNTS = [0, 2, 3, 4];
+const TEAM_DEFS = [
+  { name: 'Rouges', emoji: '🔴', color: '#e74c3c' },
+  { name: 'Bleus', emoji: '🔵', color: '#3498db' },
+  { name: 'Verts', emoji: '🟢', color: '#2ecc71' },
+  { name: 'Jaunes', emoji: '🟡', color: '#f39c12' }
+];
+
 const lobbies = new Map(); // code -> lobby
 let nextPlayerId = 1;
 
@@ -148,26 +157,94 @@ function lobbyState(lobby) {
   };
 }
 
+/** Vitesse d'un joueur en mots par minute (plancher d'une seconde). */
+function playerWpm(lobby, p, now = Date.now()) {
+  const elapsedMin = Math.max(((p.finishTime || now) - lobby.race.startTime) / 60000, 1 / 60);
+  return Math.round((p.chars + p.partial) / 5 / elapsedMin);
+}
+
+/**
+ * Répartit les coureurs au hasard en équipes de tailles équilibrées
+ * (une différence d'un joueur au maximum).
+ */
+function assignTeams(racers, nbTeams) {
+  const shuffled = racers.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const teams = TEAM_DEFS.slice(0, nbTeams).map((def, index) => ({
+    ...def, index, memberIds: [], rank: null, finishTime: null
+  }));
+  shuffled.forEach((p, i) => {
+    const t = teams[i % nbTeams];
+    p.team = t.index;
+    t.memberIds.push(p.id);
+  });
+  return teams;
+}
+
+/** Membres d'une équipe encore présents dans le salon. */
+function teamMembers(lobby, team) {
+  return team.memberIds.map((id) => lobby.players.get(id)).filter(Boolean);
+}
+
+/** Message décrivant la course qui commence (mots ou frappes, équipes). */
+function raceSetupMsg(lobby) {
+  return {
+    type: 'race_setup',
+    mode: lobby.race.mode,
+    words: lobby.race.words,
+    target: lobby.race.target,
+    teams: lobby.race.teams
+      ? lobby.race.teams.map((t) => ({
+        index: t.index,
+        name: t.name,
+        emoji: t.emoji,
+        color: t.color,
+        members: teamMembers(lobby, t).map((p) => ({ id: p.id, name: p.name }))
+      }))
+      : null
+  };
+}
+
+/** État d'une équipe : la progression est la moyenne de ses membres. */
+function teamState(lobby, team, now = Date.now()) {
+  const members = teamMembers(lobby, team);
+  const progress = members.length
+    ? members.reduce((s, p) => s + p.progress, 0) / members.length : 0;
+  const wpm = members.length
+    ? Math.round(members.reduce((s, p) => s + playerWpm(lobby, p, now), 0) / members.length) : 0;
+  return {
+    index: team.index,
+    name: team.name,
+    emoji: team.emoji,
+    color: team.color,
+    progress,
+    wpm,
+    finishedCount: members.filter((p) => p.finished).length,
+    total: members.length,
+    rank: team.rank
+  };
+}
+
 function progressState(lobby) {
   const now = Date.now();
   return {
     type: 'progress',
     players: [...lobby.players.values()]
       .filter((p) => !p.spectator)
-      .map((p) => {
-        // Plancher d'une seconde pour éviter des MPM absurdes en début de course
-        const elapsedMin = Math.max(((p.finishTime || now) - lobby.race.startTime) / 60000, 1 / 60);
-        const chars = p.chars + p.partial;
-        return {
-          id: p.id,
-          progress: p.progress,
-          wordIndex: p.wordIndex,
-          wpm: Math.round(chars / 5 / elapsedMin),
-          finished: p.finished,
-          rank: p.rank,
-          disconnected: p.ws.readyState !== p.ws.OPEN
-        };
-      })
+      .map((p) => ({
+        id: p.id,
+        progress: p.progress,
+        wordIndex: p.wordIndex,
+        wpm: playerWpm(lobby, p, now),
+        finished: p.finished,
+        rank: p.rank,
+        disconnected: p.ws.readyState !== p.ws.OPEN
+      })),
+    teams: lobby.race.teams
+      ? lobby.race.teams.map((t) => teamState(lobby, t, now)) : null
   };
 }
 
@@ -191,16 +268,26 @@ function startRace(lobby) {
     target: mode === 'echauffement' ? charCount : null,
     startTime: null,
     finishedCount: 0,
+    teamFinishedCount: 0,
+    teams: null,
     tick: null
   };
   for (const p of lobby.players.values()) {
     // L'hôte organise la course mais n'y participe pas — sauf en solo,
     // où il est le seul joueur.
     p.spectator = !lobby.solo && p.id === lobby.hostId;
+    p.team = null;
     resetPlayerRace(p);
   }
+
+  // Tirage au sort des équipes (il en faut au moins deux pour que ça ait
+  // un sens : sinon on retombe sur une course individuelle)
+  const racers = [...lobby.players.values()].filter((p) => !p.spectator);
+  const nbTeams = Math.min(lobby.options.teams || 0, racers.length);
+  if (nbTeams >= 2) lobby.race.teams = assignTeams(racers, nbTeams);
+
   broadcast(lobby, lobbyState(lobby));
-  broadcast(lobby, { type: 'race_setup', mode, words: lobby.race.words, target: lobby.race.target });
+  broadcast(lobby, raceSetupMsg(lobby));
 
   let n = 3;
   const step = () => {
@@ -230,6 +317,25 @@ function finishPlayer(lobby, player) {
     name: player.name,
     rank: player.rank
   });
+
+  // Une équipe a terminé quand tous ses membres sont arrivés
+  const team = lobby.race.teams && player.team !== null
+    ? lobby.race.teams[player.team] : null;
+  if (team && team.rank === null) {
+    const members = teamMembers(lobby, team);
+    if (members.length && members.every((p) => p.finished)) {
+      team.rank = ++lobby.race.teamFinishedCount;
+      team.finishTime = Date.now();
+      broadcast(lobby, {
+        type: 'team_finished',
+        index: team.index,
+        name: team.name,
+        emoji: team.emoji,
+        rank: team.rank
+      });
+    }
+  }
+
   maybeEndRace(lobby);
 }
 
@@ -245,6 +351,7 @@ function endRace(lobby) {
         id: p.id,
         name: p.name,
         color: p.color,
+        team: p.team,
         rank: p.rank,
         finished: p.finished,
         time,
@@ -259,7 +366,20 @@ function endRace(lobby) {
       if (a.finished) return a.rank - b.rank;
       return b.wordIndex - a.wordIndex;
     });
-  broadcast(lobby, { type: 'results', results });
+
+  // Classement des équipes : celles qui ont fini d'abord, puis à la
+  // progression moyenne
+  const teams = lobby.race.teams
+    ? lobby.race.teams
+      .map((t) => teamState(lobby, t))
+      .sort((a, b) => {
+        if ((a.rank === null) !== (b.rank === null)) return a.rank === null ? 1 : -1;
+        if (a.rank !== null) return a.rank - b.rank;
+        return b.progress - a.progress;
+      })
+    : null;
+
+  broadcast(lobby, { type: 'results', results, teams });
   broadcast(lobby, lobbyState(lobby));
 
   // Enregistre les courses terminées. Les entraînements solo vont dans
@@ -363,7 +483,8 @@ wss.on('connection', (ws) => {
             options: {
               mode: 'mots',
               wordCount: WORD_COUNTS.includes(msg.wordCount) ? msg.wordCount : 20,
-              charCount: 200
+              charCount: 200,
+              teams: 0
             },
             classe: solo ? '' : String(msg.classe || '').trim().slice(0, 20),
             players: new Map(),
@@ -390,12 +511,7 @@ wss.on('connection', (ws) => {
         if (lobby.solo) {
           startRace(lobby);
         } else if (player.spectator && lobby.race) {
-          send(ws, {
-            type: 'race_setup',
-            mode: lobby.race.mode,
-            words: lobby.race.words,
-            target: lobby.race.target
-          });
+          send(ws, raceSetupMsg(lobby));
           send(ws, { type: 'go' });
         }
         break;
@@ -409,7 +525,8 @@ wss.on('connection', (ws) => {
           ? msg.wordCount : lobby.options.wordCount;
         const charCount = [100, 200, 300, 400].includes(msg.charCount)
           ? msg.charCount : lobby.options.charCount;
-        lobby.options = { mode, wordCount, charCount };
+        const teams = TEAM_COUNTS.includes(msg.teams) ? msg.teams : lobby.options.teams;
+        lobby.options = { mode, wordCount, charCount, teams };
         broadcast(lobby, lobbyState(lobby));
         break;
       }

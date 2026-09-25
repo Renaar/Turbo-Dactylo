@@ -19,6 +19,13 @@ ligne d'arrivée !
   hasard dans une banque de 1 100 mots courants de la langue française et
   envoyée à tous les joueurs — la course est équitable.
 - **Nombre de mots réglable** : de 10 à 40 mots par course.
+- **🤝 Course par équipes** : l'hôte choisit 2, 3 ou 4 équipes et le serveur
+  répartit les élèves **au hasard**, en équipes équilibrées. Chacun découvre
+  son équipe pendant le décompte, puis la piste affiche une voiture par
+  équipe : elle avance à la **progression moyenne de ses membres**, et une
+  équipe n'arrive que lorsque tous ses membres ont terminé. Les classements
+  restent individuels : jouer en équipe ne change rien à ce qui est
+  enregistré.
 - **Mode échauffement** : taper n'importe quels caractères le plus vite
   possible (100 à 400 frappes) — parfait pour délier les doigts en début de
   séance.
